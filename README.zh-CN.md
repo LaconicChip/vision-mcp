@@ -220,6 +220,7 @@ args: []
 ```bash
 vision-mcp --status                 # 路由/通道状态
 vision-mcp --verify /path/x.png     # 对一张图跑一次完整竞速，打印获胜模型
+vision-mcp --ocr /path/x.png        # 只跑系统原生 OCR（不调模型）
 vision-mcp                          # 以 MCP stdio 模式运行
 ```
 

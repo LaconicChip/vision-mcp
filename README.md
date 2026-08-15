@@ -221,6 +221,7 @@ When installed as a package, use the `vision-mcp` command; from a checkout, use 
 ```bash
 vision-mcp --status                 # routing / channel readiness
 vision-mcp --verify /path/x.png     # run one real race, print winner
+vision-mcp --ocr /path/x.png        # run platform-native OCR only (no model calls)
 vision-mcp                          # run as MCP stdio server
 ```
 
