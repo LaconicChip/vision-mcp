@@ -150,7 +150,7 @@ class RoutingTest(unittest.TestCase):
                     {"id": "a", "base_url": "https://a.example/v1/chat/completions", "model": "m1", "api_key": "k"},
                     {"id": "b", "base_url": "https://b.example/v1/chat/completions", "model": "m2", "api_key": "k"},
                 ],
-                "ocr": {"system": {"enabled": True, "languages": ""}, "tesseract": {"enabled": False}},
+                "ocr": {"system": {"enabled": True, "languages": ""}},
             }), encoding="utf-8")
             cfg = srv.Config(str(cfg_path))
             router = srv.VisionRouter(cfg.get)
@@ -192,34 +192,32 @@ class ServerCommandTest(unittest.TestCase):
 class SystemOcrTest(unittest.TestCase):
     """system_ocr()：自动识别平台分发；旧配置（无 system 块）兼容。"""
 
-    def test_linux_delegates_to_tesseract(self):
-        config = {"ocr": {"system": {"enabled": True, "languages": ""},
-                          "tesseract": {"enabled": False, "command": "tesseract", "languages": "eng"}}}
+    def test_unsupported_platform_raises(self):
+        config = {"ocr": {"system": {"enabled": True, "languages": ""}}}
         with unittest.mock.patch.object(srv.platform, "system", return_value="Linux"):
             with self.assertRaises(RuntimeError) as ctx:
-                srv.system_ocr(config, b"x", "image/png", False)
-            self.assertIn("Tesseract", str(ctx.exception))
+                srv.system_ocr(config, b"x", False)
+            self.assertIn("不支持", str(ctx.exception))
 
     def test_darwin_disabled_raises(self):
-        config = {"ocr": {"system": {"enabled": False, "languages": ""},
-                          "tesseract": {"enabled": True, "command": "tesseract", "languages": "eng"}}}
+        config = {"ocr": {"system": {"enabled": False, "languages": ""}}}
         with unittest.mock.patch.object(srv.platform, "system", return_value="Darwin"):
             with self.assertRaises(RuntimeError) as ctx:
-                srv.system_ocr(config, b"x", "image/png", False)
+                srv.system_ocr(config, b"x", False)
             self.assertIn("系统 OCR 未启用", str(ctx.exception))
 
     def test_legacy_config_defaults_system_enabled(self):
-        # 旧配置只有 baidu/tesseract、无 system 块 → 归一化后 system 默认启用、baidu 被忽略
+        # 旧配置只有 baidu、无 system 块 → 归一化后 system 默认启用、baidu/tesseract 均不出现
         with tempfile.TemporaryDirectory() as tmp:
             cfg_path = Path(tmp) / "config.json"
             cfg_path.write_text(json.dumps({
-                "ocr": {"baidu": {"enabled": True}, "tesseract": {"enabled": False}},
+                "ocr": {"baidu": {"enabled": True}},
             }), encoding="utf-8")
             cfg = srv.Config(str(cfg_path))
             ocr = cfg.get()["ocr"]
             self.assertTrue(ocr["system"]["enabled"])
-            self.assertFalse(ocr["tesseract"]["enabled"])
             self.assertNotIn("baidu", ocr)
+            self.assertNotIn("tesseract", ocr)
 
 
 if __name__ == "__main__":

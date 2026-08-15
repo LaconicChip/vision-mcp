@@ -61,7 +61,7 @@ The five-way race starts five provider requests per uncached image. If request c
 flowchart LR
     A["Agent sees an image"] --> B["understand_image / vision_analyze"]
     B --> R["Five-model race<br/>glm-4v + glm-thinking + glm-4.6v<br/>agnes-2.5 + agnes-2.0"]
-    B --> O["OCR route<br/>system OCR (macOS / Windows) / Tesseract"]
+    B --> O["OCR route<br/>system OCR (macOS / Windows)"]
     B --> C["Custom routes<br/>cloud / relay / local"]
     R --> T["Grounded text block"]
     O --> T
@@ -73,7 +73,7 @@ flowchart LR
 
 - Default route filter is not applied — the server answers any client that asks.
 - Missing-key channels are skipped immediately and quietly.
-- OCR intent uses system-native OCR — Apple Vision on macOS, Windows OCR on Windows, Tesseract on Linux — all local and offline.
+- OCR intent uses system-native OCR — Apple Vision on macOS, Windows OCR on Windows — all local and offline.
 - `glm-4.6v-flash` is kept in the race but flagged unstable (rate limits / slow).
 
 ## Quick start
@@ -228,7 +228,7 @@ vision-mcp                          # run as MCP stdio server
 ## Privacy & failure behavior
 
 - Image bytes are sent to configured cloud channels; use local OCR/VLM or disable channels for sensitive data.
-- OCR is fully local — Apple Vision (macOS), Windows OCR (Windows), Tesseract (Linux) — image bytes never leave the machine for OCR.
+- OCR is fully local — Apple Vision (macOS), Windows OCR (Windows) — image bytes never leave the machine for OCR.
 - Keys are masked in `vision_status` / `vision_config` and never included in status output.
 - A channel without a key is skipped; requests never silently drop images.
 - On total failure, the tool returns a clear error with every attempt recorded.

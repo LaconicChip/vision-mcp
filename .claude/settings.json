@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m unittest discover -s tests)",
+      "Bash(python3 server.py --ocr /tmp/ocr-test.png)",
+      "Bash(DS_VISION_CONFIG=config.json python3 server.py --status)"
+    ]
+  }
+}

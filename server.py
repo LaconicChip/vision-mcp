@@ -8,7 +8,7 @@ vision-mcp
 路由优先级：
   1. race：五模型并发竞速，首个有效结果获胜（glm / glm-thinking / glm-4.6v / agnes×2）
   2. fallback：五模型全部失败/超时后，降级到用户自定义的保底多模态模型
-  3. OCR：仍失败且需要文字提取时，尝试 系统原生OCR（macOS Vision / Windows OCR / Tesseract）
+  3. OCR：仍失败且需要文字提取时，尝试 系统原生OCR（macOS Vision / Windows OCR）
   4. 全部失败 → 明确报错并返回完整尝试记录
 
 配置：config.json（支持 // 和 # 注释），支持热重载。
@@ -22,7 +22,6 @@ import json
 import mimetypes
 import os
 import platform
-import shutil
 import ssl
 import subprocess
 import sys
@@ -31,12 +30,11 @@ import threading
 import time
 import traceback
 import urllib.error
-import urllib.parse
 import urllib.request
 from pathlib import Path
 
 SERVER_NAME = "vision-mcp"
-SERVER_VERSION = "1.2.0"
+SERVER_VERSION = "1.3.0"
 PROTOCOL_VERSION = "2024-11-05"
 IS_FROZEN = bool(getattr(sys, "frozen", False))
 
@@ -49,13 +47,12 @@ def _base_dir() -> Path:
 
 
 BASE_DIR = _base_dir()
-DEFAULT_CONFIG = BASE_DIR / "config.json"
 
 DEFAULT_PROMPT = (
     "请详细描述这张图片的内容，包括画面中的文字、物体、界面元素、数据、代码和可能的含义。"
     "如果这是截图，请重点提取其中的关键信息。"
 )
-DEFAULT_CONFIG_TEXT = "{\n  // =============================================================\n  // vision-mcp 配置（JSONC：支持 // 和 # 注释，保存后自动热重载）\n  // 复制/编辑 config.json 后填写你的 API Key。\n  // =============================================================\n\n  // ---- 默认提示词（可改）------------------------------------------\n  \"default_prompt\": \"请详细描述这张图片的内容，包括画面中的文字、物体、界面元素、数据、代码和可能的含义。如果这是截图，请重点提取其中的关键信息。\",\n\n  // ---- 路由顺序 ----------------------------------------------------\n  // 1) race：免费竞速池，多个模型并发，首个有效结果获胜\n  // 2) fallback：免费竞速池全部失败/超时后，自动降级到用户自定义保底模型\n  \"routing\": {\n    \"race\": [\n      \"glm\",               // glm-4v-flash\n      \"glm-thinking\",      // glm-4.1v-thinking-flash\n      \"glm-4.6v-flash\",    // glm-4.6v-flash（⚠️ 不稳定，可能限流/慢）\n      \"agnes-2.5-flash\",   // agnes-2.5-flash\n      \"agnes-2.0-flash\"    // agnes-2.0-flash\n    ],\n    \"fallback\": [\n      \"custom-1\"           // ← 用户自定义保底多模态模型（免费池全失败时自动降级）\n    ]\n  },\n\n  // ---- 免费竞速池通道：每个都是 OpenAI 兼容 chat/completions ------\n  // api_key（字面量）优先；没填则用 api_key_env 指向的环境变量。\n  \"channels\": [\n    {\n      \"id\": \"glm\",\n      \"provider\": \"zhipu\",\n      \"base_url\": \"https://open.bigmodel.cn/api/paas/v4/chat/completions\",\n      \"model\": \"glm-4v-flash\",\n      \"api_key\": \"\",                          // ← 智谱 Key（GLM_API_KEY）\n      \"api_key_env\": \"GLM_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n    {\n      \"id\": \"glm-thinking\",\n      \"provider\": \"zhipu\",\n      \"base_url\": \"https://open.bigmodel.cn/api/paas/v4/chat/completions\",\n      \"model\": \"glm-4.1v-thinking-flash\",\n      \"api_key\": \"\",                          // 与 glm 同一个智谱 Key\n      \"api_key_env\": \"GLM_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n    {\n      \"id\": \"glm-4.6v-flash\",\n      \"provider\": \"zhipu\",\n      \"base_url\": \"https://open.bigmodel.cn/api/paas/v4/chat/completions\",\n      \"model\": \"glm-4.6v-flash\",\n      \"api_key\": \"\",                          // 与 glm 同一个智谱 Key\n      \"api_key_env\": \"GLM_API_KEY\",\n      \"timeout_ms\": 120000,\n      \"max_tokens\": 2048,\n      \"note\": \"glm-4.6v-flash 可用但不稳定：可能 429 限流或响应很慢（实测约 24s），保留作补充\"\n    },\n    {\n      \"id\": \"agnes-2.5-flash\",\n      \"provider\": \"agnes\",\n      \"base_url\": \"https://apihub.agnes-ai.com/v1/chat/completions\",\n      \"model\": \"agnes-2.5-flash\",\n      \"api_key\": \"\",                          // ← Agnes Key（AGNES_API_KEY）\n      \"api_key_env\": \"AGNES_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n    {\n      \"id\": \"agnes-2.0-flash\",\n      \"provider\": \"agnes\",\n      \"base_url\": \"https://apihub.agnes-ai.com/v1/chat/completions\",\n      \"model\": \"agnes-2.0-flash\",\n      \"api_key\": \"\",                          // 与 agnes-2.5-flash 同一个 key\n      \"api_key_env\": \"AGNES_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n\n    // ---- 用户自定义保底通道（免费竞速池全部失败后自动降级到这里）----\n    // 自行填写你的多模态模型地址、模型名和 key；也可从环境变量读取。\n    {\n      \"id\": \"custom-1\",\n      \"provider\": \"custom\",\n      \"base_url\": \"\",                          // ← 你的保底多模态模型 chat/completions 地址\n      \"model\": \"\",                             // ← 你的保底模型名\n      \"api_key\": \"\",                           // ← 你的保底模型 key（或留空用下面环境变量）\n      \"api_key_env\": \"VISION_CUSTOM_API_KEY\",\n      \"timeout_ms\": 120000,\n      \"max_tokens\": 4096\n    }\n  ],\n\n  // 限额：单图大小、超时、默认 max_tokens\n  \"limits\": {\n    \"max_file_bytes\": 15728640,   // 15 MB\n    \"timeout_ms\": 90000,\n    \"max_tokens\": 1024\n  },\n\n  // 缓存：按图片内容哈希缓存结果，避免重复调用\n  \"storage\": {\n    \"cache_enabled\": true,\n    \"cache_dir\": \"~/.cache/vision-mcp\",\n    \"cache_ttl_seconds\": 604800   // 7 天\n  },\n\n  // OCR（可选）：纯文字提取时兜底（系统原生，本地离线，不上云）\n  \"ocr\": {\n    \"system\": {\n      \"enabled\": true,\n      \"languages\": \"zh-Hans,en-US\"\n    },\n    \"tesseract\": {\n      \"enabled\": true,\n      \"command\": \"tesseract\",\n      \"languages\": \"chi_sim+eng\"\n    }\n  },\n\n  // 文档解析（可选）：PDF/Word/PPT 走 MinerU\n  \"document\": {\n    \"mineru\": {\n      \"enabled\": false,\n      \"command\": \"mineru-open-api\",\n      \"mode\": \"flash\"\n    }\n  }\n}\n"
+DEFAULT_CONFIG_TEXT = "{\n  // =============================================================\n  // vision-mcp 配置（JSONC：支持 // 和 # 注释，保存后自动热重载）\n  // 复制/编辑 config.json 后填写你的 API Key。\n  // =============================================================\n\n  // ---- 默认提示词（可改）------------------------------------------\n  \"default_prompt\": \"请详细描述这张图片的内容，包括画面中的文字、物体、界面元素、数据、代码和可能的含义。如果这是截图，请重点提取其中的关键信息。\",\n\n  // ---- 路由顺序 ----------------------------------------------------\n  // 1) race：免费竞速池，多个模型并发，首个有效结果获胜\n  // 2) fallback：免费竞速池全部失败/超时后，自动降级到用户自定义保底模型\n  \"routing\": {\n    \"race\": [\n      \"glm\",               // glm-4v-flash\n      \"glm-thinking\",      // glm-4.1v-thinking-flash\n      \"glm-4.6v-flash\",    // glm-4.6v-flash（⚠️ 不稳定，可能限流/慢）\n      \"agnes-2.5-flash\",   // agnes-2.5-flash\n      \"agnes-2.0-flash\"    // agnes-2.0-flash\n    ],\n    \"fallback\": [\n      \"custom-1\"           // ← 用户自定义保底多模态模型（免费池全失败时自动降级）\n    ]\n  },\n\n  // ---- 免费竞速池通道：每个都是 OpenAI 兼容 chat/completions ------\n  // api_key（字面量）优先；没填则用 api_key_env 指向的环境变量。\n  \"channels\": [\n    {\n      \"id\": \"glm\",\n      \"provider\": \"zhipu\",\n      \"base_url\": \"https://open.bigmodel.cn/api/paas/v4/chat/completions\",\n      \"model\": \"glm-4v-flash\",\n      \"api_key\": \"\",                          // ← 智谱 Key（GLM_API_KEY）\n      \"api_key_env\": \"GLM_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n    {\n      \"id\": \"glm-thinking\",\n      \"provider\": \"zhipu\",\n      \"base_url\": \"https://open.bigmodel.cn/api/paas/v4/chat/completions\",\n      \"model\": \"glm-4.1v-thinking-flash\",\n      \"api_key\": \"\",                          // 与 glm 同一个智谱 Key\n      \"api_key_env\": \"GLM_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n    {\n      \"id\": \"glm-4.6v-flash\",\n      \"provider\": \"zhipu\",\n      \"base_url\": \"https://open.bigmodel.cn/api/paas/v4/chat/completions\",\n      \"model\": \"glm-4.6v-flash\",\n      \"api_key\": \"\",                          // 与 glm 同一个智谱 Key\n      \"api_key_env\": \"GLM_API_KEY\",\n      \"timeout_ms\": 120000,\n      \"max_tokens\": 2048,\n      \"note\": \"glm-4.6v-flash 可用但不稳定：可能 429 限流或响应很慢（实测约 24s），保留作补充\"\n    },\n    {\n      \"id\": \"agnes-2.5-flash\",\n      \"provider\": \"agnes\",\n      \"base_url\": \"https://apihub.agnes-ai.com/v1/chat/completions\",\n      \"model\": \"agnes-2.5-flash\",\n      \"api_key\": \"\",                          // ← Agnes Key（AGNES_API_KEY）\n      \"api_key_env\": \"AGNES_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n    {\n      \"id\": \"agnes-2.0-flash\",\n      \"provider\": \"agnes\",\n      \"base_url\": \"https://apihub.agnes-ai.com/v1/chat/completions\",\n      \"model\": \"agnes-2.0-flash\",\n      \"api_key\": \"\",                          // 与 agnes-2.5-flash 同一个 key\n      \"api_key_env\": \"AGNES_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n\n    // ---- 用户自定义保底通道（免费竞速池全部失败后自动降级到这里）----\n    // 自行填写你的多模态模型地址、模型名和 key；也可从环境变量读取。\n    {\n      \"id\": \"custom-1\",\n      \"provider\": \"custom\",\n      \"base_url\": \"\",                          // ← 你的保底多模态模型 chat/completions 地址\n      \"model\": \"\",                             // ← 你的保底模型名\n      \"api_key\": \"\",                           // ← 你的保底模型 key（或留空用下面环境变量）\n      \"api_key_env\": \"VISION_CUSTOM_API_KEY\",\n      \"timeout_ms\": 120000,\n      \"max_tokens\": 4096\n    }\n  ],\n\n  // 限额：单图大小、超时、默认 max_tokens\n  \"limits\": {\n    \"max_file_bytes\": 15728640,   // 15 MB\n    \"timeout_ms\": 90000,\n    \"max_tokens\": 1024\n  },\n\n  // 缓存：按图片内容哈希缓存结果，避免重复调用\n  \"storage\": {\n    \"cache_enabled\": true,\n    \"cache_dir\": \"~/.cache/vision-mcp\",\n    \"cache_ttl_seconds\": 604800   // 7 天\n  },\n\n  // OCR（可选）：纯文字提取时兜底（系统原生，本地离线，不上云）\n  \"ocr\": {\n    \"system\": {\n      \"enabled\": true,\n      \"languages\": \"zh-Hans,en-US\"\n    }\n  },\n\n  // 文档解析（可选）：PDF/Word/PPT 走 MinerU\n  \"document\": {\n    \"mineru\": {\n      \"enabled\": false,\n      \"command\": \"mineru-open-api\",\n      \"mode\": \"flash\"\n    }\n  }\n}\n"
 
 USER_CONFIG_DIR = Path.home() / ".config" / "vision-mcp"
 USER_CONFIG = USER_CONFIG_DIR / "config.json"
@@ -299,7 +296,6 @@ def normalize(raw: dict) -> dict:
     ocr = raw.get("ocr") or {}
     document = raw.get("document") or {}
     sys_ocr = ocr.get("system") or {}
-    tess = ocr.get("tesseract") or {}
     mineru = document.get("mineru") or {}
 
     cache_dir = os.path.expanduser(os.path.expandvars(storage.get("cache_dir") or "~/.cache/vision-mcp"))
@@ -319,9 +315,6 @@ def normalize(raw: dict) -> dict:
         "ocr": {
             "system": {"enabled": bool(sys_ocr.get("enabled", True)),
                        "languages": sys_ocr.get("languages", "")},
-            "tesseract": {"enabled": bool(tess.get("enabled", True)),
-                          "command": tess.get("command", "tesseract"),
-                          "languages": tess.get("languages", "eng")},
         },
         "document": {"mineru": {"enabled": bool(mineru.get("enabled", False)),
                                 "command": mineru.get("command", "mineru-open-api"),
@@ -372,10 +365,6 @@ def read_image_bytes(image: str) -> tuple[str, str]:
         return mime, image
     except Exception:
         raise ValueError("无法解析 image：既不是本地文件，也不是 http(s) URL、data URI 或有效 base64")
-
-
-def _ext_for_mime(mime: str) -> str:
-    return {v: k for k, v in IMAGE_MIME.items()}.get(mime, ".png")
 
 
 def call_channel(channel: dict, data_url: str, prompt: str, max_tokens: int,
@@ -567,35 +556,17 @@ def windows_ocr(image: bytes, languages: str) -> dict:
             "metadata": {"local": True, "engine": "Windows.Media.Ocr"}, "latency_ms": 0}
 
 
-def system_ocr(config: dict, image: bytes, mime: str, accurate: bool) -> dict:
-    """系统原生 OCR，自动识别平台：macOS Vision / Windows OCR / Linux Tesseract。"""
+def system_ocr(config: dict, image: bytes, accurate: bool) -> dict:
+    """系统原生 OCR，自动识别平台：macOS Vision / Windows OCR。"""
     sysname = platform.system()
     ocr_cfg = config["ocr"]
+    if not ocr_cfg["system"]["enabled"]:
+        raise RuntimeError("系统 OCR 未启用")
     if sysname == "Darwin":
-        if not ocr_cfg["system"]["enabled"]:
-            raise RuntimeError("系统 OCR 未启用")
         return macos_vision_ocr(image, accurate, ocr_cfg["system"]["languages"])
     if sysname == "Windows":
-        if not ocr_cfg["system"]["enabled"]:
-            raise RuntimeError("系统 OCR 未启用")
         return windows_ocr(image, ocr_cfg["system"]["languages"])
-    return tesseract_ocr(config, image, mime)  # Linux 及其他平台
-
-
-def tesseract_ocr(config: dict, image: bytes, mime: str) -> dict:
-    ocr = config["ocr"]["tesseract"]
-    if not ocr["enabled"]:
-        raise RuntimeError("Tesseract 未启用")
-    if shutil.which(ocr["command"]) is None:
-        raise RuntimeError(f"找不到命令 {ocr['command']}")
-    with tempfile.TemporaryDirectory(prefix="ds-vision-ocr-") as tmp:
-        path = os.path.join(tmp, "input" + _ext_for_mime(mime))
-        open(path, "wb").write(image)
-        text = _run([ocr["command"], path, "stdout", "-l", ocr["languages"]],
-                    int(config.get("timeout_ms", 90000))).strip()
-    if not text:
-        raise RuntimeError("Tesseract 未识别到文字")
-    return {"content": text, "tool_used": f"tesseract:{ocr['languages']}", "confidence": "medium", "metadata": {"local": True}, "latency_ms": 0}
+    raise RuntimeError(f"当前平台 {sysname} 不支持系统 OCR（仅 macOS / Windows）")
 
 
 def _find_md(root: str) -> str | None:
@@ -748,19 +719,14 @@ class VisionRouter:
                         attempts.append({"channel": cid, "ok": False,
                                          "latency_ms": int((time.time() - started) * 1000), "error": error_text(e)})
 
-        # 3) 后续兜底：OCR（系统原生，自动识别平台）
+        # 3) 后续兜底：OCR（系统原生，macOS Vision / Windows OCR）
         if intent in ("auto", "ocr") or accurate_ocr:
-            mime = data_url.split(";")[0][5:]
-            ocr_tools = [("system", lambda: system_ocr(config, image, mime, accurate_ocr))]
-            if config["ocr"]["tesseract"]["enabled"]:
-                ocr_tools.append(("tesseract", lambda: tesseract_ocr(config, image, mime)))
-            for tool, fn in ocr_tools:
-                try:
-                    result = fn()
-                    result.setdefault("metadata", {})["attempts"] = attempts
-                    return result
-                except Exception as e:
-                    attempts.append({"tool": tool, "error": error_text(e)})
+            try:
+                result = system_ocr(config, image, accurate_ocr)
+                result.setdefault("metadata", {})["attempts"] = attempts
+                return result
+            except Exception as e:
+                attempts.append({"tool": "system", "error": error_text(e)})
 
         raise RuntimeError(f"没有视觉路由成功: {json.dumps(attempts, ensure_ascii=False)}")
 
@@ -894,7 +860,7 @@ def _run_tool(name: str, args: dict) -> str:
             state = "disabled" if ch.get("enabled") is False else ("ready" if ready else f"missing {ch.get('api_key_env')}")
             note = ("  ⚠️不稳定" if ch.get("id") == "glm-4.6v-flash" else "")
             lines.append(f"    - {ch.get('id')}: {ch.get('model')} [{state}]{note}")
-        lines.append(f"  OCR: 系统={bool(cfg['ocr']['system']['enabled'])}({platform.system()}) Tesseract={bool(cfg['ocr']['tesseract']['enabled'])}")
+        lines.append(f"  OCR: 系统={bool(cfg['ocr']['system']['enabled'])}({platform.system()})")
         lines.append(f"  MinerU: {'on' if bool(cfg['document']['mineru']['enabled']) else 'off'}")
         return "\n".join(lines)
     raise ValueError(f"未知工具: {name}")
@@ -980,7 +946,7 @@ def main() -> int:
             "max_tokens": args.max_tokens, "timeout_ms": args.timeout * 1000,
             "max_file_bytes": 15 * 1024 * 1024,
             "cache": {"enabled": False, "directory": "", "ttl_seconds": 0},
-            "ocr": {"system": {"enabled": True, "languages": ""}, "tesseract": {"enabled": False}},
+            "ocr": {"system": {"enabled": True, "languages": ""}},
             "document": {"mineru": {"enabled": False}},
         }
         _HOLDER["config"] = _MemoryConfig(mem)
@@ -1006,8 +972,7 @@ def main() -> int:
             print(f"找不到图片: {path}", file=sys.stderr)
             return 1
         raw = open(path, "rb").read()
-        mime = mimetypes.guess_type(path)[0] or "image/png"
-        env = system_ocr(_router().config, raw, mime, args.accurate_ocr)
+        env = system_ocr(_router().config, raw, args.accurate_ocr)
         print(f"OCR: {env['tool_used']}\nConfidence: {env['confidence']}\n{env['content']}")
         return 0
     main_loop()

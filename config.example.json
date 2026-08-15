@@ -111,11 +111,6 @@
     "system": {
       "enabled": true,
       "languages": "zh-Hans,en-US"
-    },
-    "tesseract": {
-      "enabled": true,
-      "command": "tesseract",
-      "languages": "chi_sim+eng"
     }
   },
 
