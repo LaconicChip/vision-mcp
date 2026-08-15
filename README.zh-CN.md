@@ -1,22 +1,15 @@
 <h1 align="center">vision-mcp</h1>
 
-<p align="center">
-  <strong>贴一张图，让多个视觉模型竞速，纯文本模型也能"看图"。</strong>
-</p>
+<p align="center"><strong>贴一张图，让多个视觉模型竞速，纯文本模型也能"看图"。</strong></p>
+
+<p align="center">🌐 <a href="README.md">English</a></p>
 
 <p align="center">
-  <a href="README.md">English</a>
-  ·
-  <a href="#快速开始">快速开始</a>
-  ·
-  <a href="#路由">路由</a>
-  ·
-  <a href="#注册到你的-agent">注册</a>
-  ·
-  <a href="#配置">配置</a>
-  ·
-  <a href="#基于">基于</a>
-  ·
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#路由">路由</a> ·
+  <a href="#注册到你的-agent">注册</a> ·
+  <a href="#配置">配置</a> ·
+  <a href="#基于">基于</a> ·
   <a href="#开源许可">开源许可</a>
 </p>
 
@@ -188,6 +181,8 @@ python3 install.py --print-clients
 | `glm-4.6v-flash` | glm-4.6v-flash（⚠️ 不稳定） | `GLM_API_KEY` |
 | `agnes-2.5-flash` | agnes-2.5-flash | `AGNES_API_KEY` |
 | `agnes-2.0-flash` | agnes-2.0-flash | `AGNES_API_KEY` |
+
+> ℹ️ 保底通道（`volcengine`）默认**不预填任何 key**。免费竞速池全部失败后会自动降级到该保底通道，请在 `config.json` 里自行填写你的 key（或设置 `GLM_MCP_API_KEY`）。
 
 添加任意 OpenAI 兼容视觉模型：新增一个通道，并把它的 id 放进 `routing.race` 或 `routing.fallback`。
 

@@ -9,7 +9,7 @@
   // 也可以留空，改用环境变量 GLM_MCP_API_KEY。
   "legacy": {
     "provider": "volcengine-ark",
-    "api_key": "",                          // ← 火山引擎 Ark Key
+    "api_key": "",                          // ← 保底通道 key，请自行填写（或留空，改用环境变量 GLM_MCP_API_KEY）
     "model": "minimax-m3",
     "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
     "max_tokens": 2048,
@@ -42,7 +42,7 @@
       "provider": "volcengine-ark",
       "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions",
       "model": "minimax-m3",
-      "api_key": "",                          // ← 火山引擎 Key（或留空用 GLM_MCP_API_KEY）
+      "api_key": "",                          // ← 免费竞速池全部失败后自动降级到本保底通道，请自行填写 key；留空则用环境变量 GLM_MCP_API_KEY
       "api_key_env": "GLM_MCP_API_KEY",
       "timeout_ms": 120000,
       "max_tokens": 2048,

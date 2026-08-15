@@ -1,20 +1,15 @@
 <h1 align="center">vision-mcp</h1>
 
-<p align="center">
-  <strong>Paste an image. Let vision models race. Keep your text-only agent reasoning.</strong>
-</p>
+<p align="center"><strong>Paste an image. Let vision models race. Keep your text-only agent reasoning.</strong></p>
+
+<p align="center">🌐 <a href="README.zh-CN.md">简体中文</a></p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a>
-  ·
-  <a href="#routing">Routing</a>
-  ·
-  <a href="#register-with-your-agent">Register</a>
-  ·
-  <a href="#configuration">Configuration</a>
-  ·
-  <a href="#based-on">Based on</a>
-  ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#routing">Routing</a> ·
+  <a href="#register-with-your-agent">Register</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#based-on">Based on</a> ·
   <a href="#license">License</a>
 </p>
 
@@ -24,8 +19,6 @@
   <img alt="zero deps" src="https://img.shields.io/badge/dependencies-zero-16a34a?style=flat">
   <img alt="models" src="https://img.shields.io/badge/race-5%20models-4d6bfe?style=flat">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.9%2B-339933?style=flat&logo=python">
-<p align="center">
-  <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center"><code>agent sees image → understand_image → race ×5 → fallback → grounded text</code></p>
@@ -189,6 +182,8 @@ Each channel is an OpenAI-compatible `chat/completions` endpoint:
 | `glm-4.6v-flash` | glm-4.6v-flash (⚠️ unstable) | `GLM_API_KEY` |
 | `agnes-2.5-flash` | agnes-2.5-flash | `AGNES_API_KEY` |
 | `agnes-2.0-flash` | agnes-2.0-flash | `AGNES_API_KEY` |
+
+> ℹ️ The fallback channel (`volcengine`) is **not** pre-filled with any key. The race pool is free; when all free racers fail, the server automatically degrades to the fallback channel — fill in your own key in `config.json` (or set `GLM_MCP_API_KEY`).
 
 Add any OpenAI-compatible vision model by adding a channel and putting its id in `routing.race` or `routing.fallback`.
 
