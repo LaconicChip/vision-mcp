@@ -942,6 +942,8 @@ def main() -> int:
     parser.add_argument("--config", help="覆盖 config.json 路径")
     parser.add_argument("--status", action="store_true", help="打印路由/通道状态")
     parser.add_argument("--verify", metavar="IMAGE", help="对一张图跑一次完整竞速")
+    parser.add_argument("--ocr", metavar="IMAGE", help="对一张图跑系统原生 OCR（自动识别平台，不调视觉模型）")
+    parser.add_argument("--accurate-ocr", action="store_true", help="OCR 用精确模式")
     parser.add_argument("--prompt", default="Describe this image accurately and briefly.")
     parser.add_argument("--no-cache", action="store_true")
     # 零配置内联模式：给这些参数即可不读 config.json
@@ -985,6 +987,16 @@ def main() -> int:
     if args.verify:
         env = _router().analyze_file(args.verify, args.prompt, "reason", False, False, args.no_cache)
         print(f"Winner: {env['tool_used']}\nConfidence: {env['confidence']}\n{env['result']}")
+        return 0
+    if args.ocr:
+        path = os.path.expanduser(args.ocr)
+        if not os.path.isfile(path):
+            print(f"找不到图片: {path}", file=sys.stderr)
+            return 1
+        raw = open(path, "rb").read()
+        mime = mimetypes.guess_type(path)[0] or "image/png"
+        env = system_ocr(_router().config, raw, mime, args.accurate_ocr)
+        print(f"OCR: {env['tool_used']}\nConfidence: {env['confidence']}\n{env['content']}")
         return 0
     main_loop()
     return 0
