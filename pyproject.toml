@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vision-mcp"
-version = "1.1.0"
+version = "1.2.0"
 description = "Agent-agnostic MCP vision server: race multiple vision models, get grounded text back."
 readme = "README.md"
 requires-python = ">=3.9"

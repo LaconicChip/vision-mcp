@@ -164,5 +164,38 @@ class ServerCommandTest(unittest.TestCase):
             self.assertEqual(str(srv._base_dir()), "/opt/vision-mcp")
 
 
+class SystemOcrTest(unittest.TestCase):
+    """system_ocr()：自动识别平台分发；旧配置（无 system 块）兼容。"""
+
+    def test_linux_delegates_to_tesseract(self):
+        config = {"ocr": {"system": {"enabled": True, "languages": ""},
+                          "tesseract": {"enabled": False, "command": "tesseract", "languages": "eng"}}}
+        with unittest.mock.patch.object(srv.platform, "system", return_value="Linux"):
+            with self.assertRaises(RuntimeError) as ctx:
+                srv.system_ocr(config, b"x", "image/png", False)
+            self.assertIn("Tesseract", str(ctx.exception))
+
+    def test_darwin_disabled_raises(self):
+        config = {"ocr": {"system": {"enabled": False, "languages": ""},
+                          "tesseract": {"enabled": True, "command": "tesseract", "languages": "eng"}}}
+        with unittest.mock.patch.object(srv.platform, "system", return_value="Darwin"):
+            with self.assertRaises(RuntimeError) as ctx:
+                srv.system_ocr(config, b"x", "image/png", False)
+            self.assertIn("系统 OCR 未启用", str(ctx.exception))
+
+    def test_legacy_config_defaults_system_enabled(self):
+        # 旧配置只有 baidu/tesseract、无 system 块 → 归一化后 system 默认启用、baidu 被忽略
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg_path = Path(tmp) / "config.json"
+            cfg_path.write_text(json.dumps({
+                "ocr": {"baidu": {"enabled": True}, "tesseract": {"enabled": False}},
+            }), encoding="utf-8")
+            cfg = srv.Config(str(cfg_path))
+            ocr = cfg.get()["ocr"]
+            self.assertTrue(ocr["system"]["enabled"])
+            self.assertFalse(ocr["tesseract"]["enabled"])
+            self.assertNotIn("baidu", ocr)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

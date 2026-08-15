@@ -60,7 +60,7 @@
 flowchart LR
     A["Agent 看到一张图"] --> B["understand_image / vision_analyze"]
     B --> R["五模型竞速<br/>glm-4v + glm-thinking + glm-4.6v<br/>agnes-2.5 + agnes-2.0"]
-    B --> O["OCR 路由<br/>百度 / Tesseract"]
+    B --> O["OCR 路由<br/>系统原生 OCR（macOS / Windows）/ Tesseract"]
     B --> C["自定义路由<br/>云端 / 中转 / 本地"]
     R --> T["可靠文本"]
     O --> T
@@ -72,7 +72,7 @@ flowchart LR
 
 - 不绑定特定客户端，任何 Agent 均可调用。
 - 缺少 key 的通道会被立即静默跳过。
-- OCR 意图会先试百度 → Tesseract，再降级到视觉模型。
+- OCR 意图使用**系统原生 OCR**——macOS 用 Apple Vision、Windows 用自带 OCR、Linux 用 Tesseract，全程本地离线。
 - `glm-4.6v-flash` 保留在竞速里，但标记为不稳定（可能限流/很慢）。
 
 ## 快速开始
@@ -226,6 +226,7 @@ vision-mcp                          # 以 MCP stdio 模式运行
 ## 隐私与失败策略
 
 - 图片字节会发送到已配置的云端通道；敏感图片请使用本地 OCR/视觉模型或停用相关通道。
+- OCR 全程**本地离线**——Apple Vision（macOS）/ Windows 自带 OCR / Tesseract（Linux），识别时不把图片字节发到任何云端。
 - key 在 `vision_status` / `vision_config` 中会被打码，绝不进入状态输出。
 - 没有 key 的通道会被跳过；请求绝不会静默丢弃图片。
 - 全部失败时，工具会返回带完整尝试记录的明确错误。

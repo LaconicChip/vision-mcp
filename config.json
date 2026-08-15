@@ -106,15 +106,14 @@
     "cache_ttl_seconds": 604800   // 7 天
   },
 
-  // OCR（可选）：纯文字提取时兜底
+  // OCR（可选）：纯文字提取时兜底（系统原生，本地离线，不上云）
   "ocr": {
-    "baidu": {
-      "enabled": false,
-      "api_key_env": "BAIDU_API_KEY",
-      "secret_key_env": "BAIDU_SECRET_KEY"
+    "system": {
+      "enabled": true,
+      "languages": "zh-Hans,en-US"
     },
     "tesseract": {
-      "enabled": false,
+      "enabled": true,
       "command": "tesseract",
       "languages": "chi_sim+eng"
     }
