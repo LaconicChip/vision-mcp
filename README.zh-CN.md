@@ -75,7 +75,22 @@ flowchart LR
 - OCR 意图会先试百度 → Tesseract，再降级到视觉模型。
 - `glm-4.6v-flash` 保留在竞速里，但标记为不稳定（可能限流/很慢）。
 
+## 没有 Python？用预编译二进制
+
+用户**不需要安装 Python**。本仓库通过 GitHub Actions / `scripts/build.sh` 用 PyInstaller 打包成单文件可执行程序：
+
+- 从 **Releases** 页下载对应系统（Windows/macOS/Linux）的二进制，或自行构建。
+- 注册 MCP 时直接指向该二进制，而不是 `python3`：
+
+```text
+command: /path/to/vision-mcp          # macOS / Linux
+command: C:\path\to\vision-mcp.exe  # Windows
+```
+
+源码（`server.py`）仍完整支持已装有 Python 3.9+ 的用户。
+
 ## 快速开始
+
 
 要求：Python 3.9+。
 

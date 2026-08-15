@@ -76,7 +76,22 @@ flowchart LR
 - OCR intent tries Baidu → Tesseract, then falls back to VLM.
 - `glm-4.6v-flash` is kept in the race but flagged unstable (rate limits / slow).
 
+## No Python? Use the prebuilt binary
+
+Users **do not need to install Python**. This repository ships a single-file executable built with PyInstaller (via GitHub Actions / `scripts/build.sh`):
+
+- Download the binary for your OS from the **Releases** tab (or build it yourself).
+- Register the MCP with that binary path instead of `python3`:
+
+```text
+command: /path/to/vision-mcp          # macOS/Linux
+command: C:\path\to\vision-mcp.exe  # Windows
+```
+
+The source (`server.py`) remains fully supported for anyone who already has Python 3.9+.
+
 ## Quick start
+
 
 Requirements: Python 3.9+.
 
