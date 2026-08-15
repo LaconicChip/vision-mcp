@@ -4,3 +4,5 @@ tests/.pytest_cache/
 .DS_Store
 artifacts/
 dist/
+build/
+*.spec

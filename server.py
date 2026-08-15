@@ -35,9 +35,19 @@ import urllib.request
 from pathlib import Path
 
 SERVER_NAME = "vision-mcp"
-SERVER_VERSION = "1.0.0"
+SERVER_VERSION = "1.1.0"
 PROTOCOL_VERSION = "2024-11-05"
-BASE_DIR = Path(__file__).resolve().parent
+IS_FROZEN = bool(getattr(sys, "frozen", False))
+
+
+def _base_dir() -> Path:
+    """二进制/源码所在目录：frozen 用二进制自身路径，源码用 server.py 所在目录。"""
+    if IS_FROZEN:
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+BASE_DIR = _base_dir()
 DEFAULT_CONFIG = BASE_DIR / "config.json"
 
 DEFAULT_PROMPT = (
@@ -57,7 +67,7 @@ def resolve_config_path() -> Path:
         return Path(env)
     if USER_CONFIG.exists():
         return USER_CONFIG
-    pkg = Path(__file__).resolve().parent / "config.json"
+    pkg = BASE_DIR / "config.json"
     if pkg.exists():
         return pkg
     return USER_CONFIG
@@ -100,21 +110,46 @@ def _set_keys_in_place(path: Path, mapping: list[tuple[str, str]]) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _add_json_server(path: Path, server: str) -> None:
+def server_command() -> tuple[str, list[str]]:
+    """注册 MCP 时的启动命令：frozen 直接用二进制自身（免 Python），源码用 python3 server.py。"""
+    if IS_FROZEN:
+        return (str(Path(sys.executable).resolve()), [])
+    return ("python3", [str(Path(__file__).resolve())])
+
+
+def _add_json_server(path: Path) -> None:
     data = {}
     if path.exists():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             data = {}
+    cmd, args = server_command()
     servers = data.setdefault("mcpServers", {})
-    servers["vision-mcp"] = {"command": "python3", "args": [server]}
+    servers["vision-mcp"] = {"command": cmd, "args": args}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _register_codex(cmd: str, args: list[str]) -> None:
+    """把 vision-mcp 段写入/替换进 ~/.codex/config.toml（幂等，不重复追加）。"""
+    block = (f'[mcp_servers.vision-mcp]\ntype = "stdio"\n'
+             f'command = "{cmd}"\nargs = {json.dumps(args)}\nstartup_timeout_sec = 120\n')
+    text = CODEX_TOML.read_text(encoding="utf-8")
+    lines = text.splitlines(keepends=True)
+    start = next((i for i, ln in enumerate(lines)
+                  if ln.strip().startswith("[mcp_servers.vision-mcp") and ln.strip().endswith("]")), None)
+    if start is None:
+        CODEX_TOML.write_text((text if text.endswith("\n") else text + "\n") + "\n" + block, encoding="utf-8")
+        return
+    end = start + 1
+    while end < len(lines) and not (lines[end].strip().startswith("[") and lines[end].strip().endswith("]")):
+        end += 1
+    CODEX_TOML.write_text("".join(lines[:start]) + block + "".join(lines[end:]), encoding="utf-8")
+
+
 def cmd_install() -> int:
-    """交互式一键安装配置：填 key + 注册到 Agent。"""
+    """交互式一键安装配置：填 key + 自动注册到已发现的 Agent。"""
     cfg = init_config()
     print(f"配置: {cfg}")
 
@@ -139,26 +174,23 @@ def cmd_install() -> int:
         filled.append((tag, key))
     _set_keys_in_place(cfg, filled)
 
-    server_cmd = str(Path(__file__).resolve().parent / "server.py")
-    print("\n注册到哪个 Agent？（可多行，每次一个，空行结束）")
-    print("  输入: codex / claude / cursor")
-    while True:
-        choice = _ask("Agent", "")
-        if not choice:
-            break
-        if choice == "codex" and CODEX_TOML.exists():
-            block = f'[mcp_servers.vision-mcp]\ntype = "stdio"\ncommand = "python3"\nargs = ["{server_cmd}"]\nstartup_timeout_sec = 120\n'
-            text = CODEX_TOML.read_text(encoding="utf-8")
-            CODEX_TOML.write_text(text + "\n" + block, encoding="utf-8")
-            print("  ✓ 已写入 ~/.codex/config.toml")
-        elif choice == "claude":
-            _add_json_server(CLAUDE_JSON, server_cmd)
-            print(f"  ✓ 已写入 {CLAUDE_JSON}")
-        elif choice == "cursor":
-            _add_json_server(CURSOR_JSON, server_cmd)
-            print(f"  ✓ 已写入 {CURSOR_JSON}")
-        else:
-            print("  未知或未找到 Codex 配置，跳过。")
+    cmd, args = server_command()
+    print(f"\n注册命令: {cmd}" + (f" {' '.join(args)}" if args else ""))
+
+    registered: list[str] = []
+    if CODEX_TOML.exists():
+        _register_codex(cmd, args)
+        registered.append("Codex")
+        print("  ✓ 已注册 Codex → ~/.codex/config.toml")
+    for label, path in (("Claude Desktop", CLAUDE_JSON), ("Cursor", CURSOR_JSON)):
+        if path.exists():
+            _add_json_server(path)
+            registered.append(label)
+            print(f"  ✓ 已注册 {label} → {path}")
+    if not registered:
+        print("\n未检测到 Codex / Claude Desktop / Cursor 配置，请手动注册：")
+        print(f"  command = {cmd}")
+        print(f"  args    = {json.dumps(args)}")
 
     print("\n✅ 完成。重启对应 Agent 后即可使用。")
     return 0

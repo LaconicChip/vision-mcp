@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -139,6 +140,28 @@ class RoutingTest(unittest.TestCase):
             finally:
                 if old is not None:
                     os.environ["SURELY_MISSING_KEY_XYZ"] = old
+
+
+class ServerCommandTest(unittest.TestCase):
+    """server_command()：源码用 python3，frozen 用二进制自身（免 Python）。"""
+
+    def test_source_mode_uses_python3(self):
+        cmd, args = srv.server_command()
+        self.assertEqual(cmd, "python3")
+        self.assertEqual(len(args), 1)
+        self.assertTrue(args[0].endswith("server.py"))
+
+    def test_frozen_mode_uses_binary_itself(self):
+        with unittest.mock.patch.object(srv, "IS_FROZEN", True), \
+                unittest.mock.patch.object(srv.sys, "executable", "/usr/local/bin/vision-mcp"):
+            cmd, args = srv.server_command()
+        self.assertEqual(cmd, "/usr/local/bin/vision-mcp")
+        self.assertEqual(args, [])
+
+    def test_frozen_base_dir_is_binary_dir(self):
+        with unittest.mock.patch.object(srv, "IS_FROZEN", True), \
+                unittest.mock.patch.object(srv.sys, "executable", "/opt/vision-mcp/vision-mcp"):
+            self.assertEqual(str(srv._base_dir()), "/opt/vision-mcp")
 
 
 if __name__ == "__main__":

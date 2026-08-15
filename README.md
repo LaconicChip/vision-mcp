@@ -14,11 +14,11 @@
 </p>
 
 <p align="center">
-  <img alt="version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-0ea5e9?style=flat">
+  <img alt="version 1.1.0" src="https://img.shields.io/badge/version-1.1.0-0ea5e9?style=flat">
   <img alt="MCP server" src="https://img.shields.io/badge/MCP-stdio-111827?style=flat">
-  <img alt="zero deps" src="https://img.shields.io/badge/dependencies-zero-16a34a?style=flat">
+  <img alt="no Python needed" src="https://img.shields.io/badge/install-no%20Python-16a34a?style=flat">
   <img alt="models" src="https://img.shields.io/badge/race-5%20models-4d6bfe?style=flat">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.9%2B-339933?style=flat&logo=python">
+  <img alt="platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-4d6bfe?style=flat">
 </p>
 
 <p align="center"><code>agent sees image → understand_image → race ×5 → fallback → grounded text</code></p>
@@ -45,9 +45,9 @@ An **agent-agnostic MCP server** (stdio) that gives text-only models a natural i
 ## Why choose this MCP
 
 - **Agent-agnostic**: standard MCP stdio — works with Codex, Claude Desktop, Cursor, and any MCP client.
-- **Zero third-party dependencies**: pure Python stdlib, `python3` only.
+- **No Python required**: installs as a single self-contained binary for macOS / Linux / Windows — nothing to set up.
 - **Five-model first-success race**: `glm-4v-flash`, `glm-4.1v-thinking-flash`, `glm-4.6v-flash` (⚠️ unstable), `agnes-2.5-flash`, `agnes-2.0-flash`.
-- **User-defined fallback**: when all five free racers fail or time out, the server degrades to your own `custom-1` multimodal model.
+- **Free race, paid last-resort**: the five racers are free-tier models. Your own model (`custom-1`) — paid, private, or local — runs only when all five fail or time out, so you don't pay for normal requests.
 - **Open-ended routing**: add unlimited OpenAI-compatible channels to the race or the ordered fallback.
 - **Explicit failure behavior**: images are never silently discarded; the error includes every attempt.
 - **Human-friendly config**: JSONC supports `//` and `#` comments, hot-reloads on save.
@@ -78,9 +78,9 @@ flowchart LR
 
 ## Quick start
 
-### 一步安装（最推荐）
+### One command, nothing to install (recommended)
 
-运行下面这一条命令即可。它会**自动判断你的系统**、下载对应的**预编译二进制**（无需装 Python），然后引导你填 API Key 并注册到你的 Agent：
+No Python. No environment setup. No platform-specific steps. Run one line — it detects your OS, downloads a single self-contained binary, installs it, registers with your agent, and walks you through API keys:
 
 macOS / Linux:
 
@@ -94,14 +94,46 @@ Windows PowerShell:
 iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.ps1)
 ```
 
-完成后：重启你的 Agent，直接粘贴图片就能用。配置会生成在 `~/.config/vision-mcp/config.json`（可随时改）。
+What happens under the hood:
 
-### 其他方式（可选）
+1. Detect your OS / CPU → macOS (arm64 + x86_64), Linux (x86_64), Windows (x86_64).
+2. Download the matching **single-file binary** from GitHub Releases — **no Python**.
+3. Install to `~/.local/bin/vision-mcp` (Windows: `%LOCALAPPDATA%\vision-mcp\vision-mcp.exe`).
+4. Auto-register with Codex / Claude Desktop / Cursor when it finds them.
+5. Enter your API keys when prompted, restart your agent, and paste an image.
 
-- **已有 Python / 想装成包**：`pip install git+https://github.com/LaconicChip/vision-mcp.git && vision-mcp init`
-- **零配置文件的一行**（单通道，跨平台）：`uvx --from git+https://github.com/LaconicChip/vision-mcp vision-mcp --api-key KEY --base-url URL --model MODEL`
+Config is generated at `~/.config/vision-mcp/config.json` (edit anytime — hot-reloads). If no prebuilt binary exists for your platform, the installer falls back to `git clone` + Python.
+
+### Prefer your agent? Let it install itself
+
+Already inside Codex, Claude, or Cursor? Paste the repo link right into your session — the agent installs vision-mcp **into the very agent you're using**:
+
+> `install https://github.com/LaconicChip/vision-mcp`
+
+That's it — no terminal, no commands to copy. Any wording works ("帮我把这个 MCP 装进当前环境" works too). The agent clones the repo, runs the installer, and registers itself.
+
+### Zero-config single channel (advanced)
+
+Point the server at any OpenAI-compatible vision endpoint in one line — **no config file at all**:
+
+```bash
+vision-mcp --api-key KEY --base-url https://host/v1/chat/completions --model YOUR_VLM
+```
+
+### Other install paths (optional)
+
+<details>
+<summary>pip / uvx / from source (requires Python)</summary>
+
+- **pip**: `pip install git+https://github.com/LaconicChip/vision-mcp.git && vision-mcp init`
+- **uvx**: `uvx --from git+https://github.com/LaconicChip/vision-mcp vision-mcp --api-key KEY --base-url URL --model MODEL`
+- **from source**: `git clone https://github.com/LaconicChip/vision-mcp && cd vision-mcp && python3 server.py`
+
+</details>
 
 ## Register with your agent
+
+The one-command installer auto-registers with Codex, Claude Desktop, and Cursor when it finds them. To register manually, point any MCP client at the installed binary (no Python):
 
 ### Codex
 
@@ -109,34 +141,20 @@ iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/i
 # ~/.codex/config.toml
 [mcp_servers.vision-mcp]
 type = "stdio"
-command = "python3"
-args = ["/absolute/path/to/vision-mcp/server.py"]
+command = "/absolute/path/to/vision-mcp"   # e.g. ~/.local/bin/vision-mcp
+args = []
 startup_timeout_sec = 120
 ```
 
-### Claude Desktop
+### Claude Desktop / Cursor
 
 ```json
-// claude_desktop_config.json
+// claude_desktop_config.json  /  ~/.cursor/mcp.json
 {
   "mcpServers": {
     "vision-mcp": {
-      "command": "python3",
-      "args": ["/absolute/path/to/vision-mcp/server.py"]
-    }
-  }
-}
-```
-
-### Cursor
-
-```json
-// ~/.cursor/mcp.json
-{
-  "mcpServers": {
-    "vision-mcp": {
-      "command": "python3",
-      "args": ["/absolute/path/to/vision-mcp/server.py"]
+      "command": "/absolute/path/to/vision-mcp",
+      "args": []
     }
   }
 }
@@ -145,15 +163,11 @@ startup_timeout_sec = 120
 ### Any stdio MCP client
 
 ```text
-command: python3
-args: ["/absolute/path/to/vision-mcp/server.py"]
+command: /absolute/path/to/vision-mcp
+args: []
 ```
 
-`install.py` can print all of these snippets for you:
-
-```bash
-python3 install.py --print-clients
-```
+> From a source checkout, use `command: python3` with `args: ["/absolute/path/to/vision-mcp/server.py"]` instead.
 
 ## Configuration
 
@@ -184,7 +198,7 @@ Each channel is an OpenAI-compatible `chat/completions` endpoint:
 | `agnes-2.5-flash` | agnes-2.5-flash | `AGNES_API_KEY` |
 | `agnes-2.0-flash` | agnes-2.0-flash | `AGNES_API_KEY` |
 
-> ℹ️ The fallback channel (`custom-1`) is **not** pre-filled. The race pool is free; when all free racers fail or time out, the server degrades to `custom-1` — fill in your own multimodal model's `base_url`, `model` and key in `config.json` (or set `VISION_CUSTOM_API_KEY`).
+> 🎯 **Design philosophy**: the race pool uses **free** models, so racing all five costs nothing. `custom-1` is deliberately left blank — it's the slot for **your own** model (paid, private, or a local relay). It only runs after all five free racers fail or time out, so your paid/private model is never billed on a normal request. Fill in its `base_url`, `model` and key in `config.json` (or set `VISION_CUSTOM_API_KEY`).
 
 Add any OpenAI-compatible vision model by adding a channel and putting its id in `routing.race` or `routing.fallback`.
 

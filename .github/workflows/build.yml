@@ -14,7 +14,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            sysname: Linux
+            arch: x86_64
+          - os: windows-latest
+            sysname: Windows
+            arch: x86_64
+          - os: macos-13
+            sysname: Darwin
+            arch: x86_64
+          - os: macos-latest
+            sysname: Darwin
+            arch: arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -29,13 +41,20 @@ jobs:
       - name: Build single-file binary
         run: pyinstaller --onefile --name vision-mcp server.py
 
+      - name: Rename to release asset name
+        shell: bash
+        run: |
+          if [ "${{ matrix.sysname }}" = "Windows" ]; then
+            mv dist/vision-mcp.exe "dist/vision-mcp-${{ matrix.sysname }}-${{ matrix.arch }}.exe"
+          else
+            mv dist/vision-mcp "dist/vision-mcp-${{ matrix.sysname }}-${{ matrix.arch }}"
+          fi
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vision-mcp-${{ runner.os }}
-          path: |
-            dist/vision-mcp
-            dist/vision-mcp.exe
+          name: vision-mcp-${{ matrix.sysname }}-${{ matrix.arch }}
+          path: dist/vision-mcp-*
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -45,8 +64,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: binaries
+          merge-multiple: true
       - name: Create/update release
         uses: softprops/action-gh-release@v2
         with:
-          files: binaries/**/*
+          files: binaries/**
           generate_release_notes: true

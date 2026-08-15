@@ -14,11 +14,11 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.0.0" src="https://img.shields.io/badge/version-1.0.0-0ea5e9?style=flat">
+  <img alt="版本 1.1.0" src="https://img.shields.io/badge/version-1.1.0-0ea5e9?style=flat">
   <img alt="MCP 服务器" src="https://img.shields.io/badge/MCP-stdio-111827?style=flat">
-  <img alt="零依赖" src="https://img.shields.io/badge/dependencies-zero-16a34a?style=flat">
+  <img alt="免装 Python" src="https://img.shields.io/badge/install-no%20Python-16a34a?style=flat">
   <img alt="模型" src="https://img.shields.io/badge/race-5%20models-4d6bfe?style=flat">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.9%2B-339933?style=flat&logo=python">
+  <img alt="平台" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-4d6bfe?style=flat">
 </p>
 
 <p align="center"><code>agent 看到图 → understand_image → 五模型竞速 → 兜底 → 返回可靠文本</code></p>
@@ -44,9 +44,9 @@
 ## 为什么推荐
 
 - **Agent 无关**：标准 MCP stdio，兼容 Codex、Claude Desktop、Cursor 等任意 MCP 客户端。
-- **零第三方依赖**：纯 Python 标准库，`python3` 即可运行。
+- **免装 Python**：单文件自包含二进制，覆盖 macOS / Linux / Windows，无需任何环境配置。
 - **五模型并发竞速**：`glm-4v-flash`、`glm-4.1v-thinking-flash`、`glm-4.6v-flash`（⚠️ 不稳定）、`agnes-2.5-flash`、`agnes-2.0-flash`，首个有效结果获胜。
-- **用户自定义保底**：五模型全部失败/超时后，自动降级到你自己的 `custom-1` 多模态模型。
+- **免费竞速、付费兜底**：竞速池五个模型都是**免费**的；你自己的模型（`custom-1`，付费 / 私有 / 本地均可）只在五路全部失败/超时后才运行，日常请求不花你的钱。
 - **路由可自由扩展**：可添加任意数量的 OpenAI 兼容通道，加入并发池或顺序降级队列。
 - **失败可见**：图片不会被静默丢弃；报错里包含每一次尝试记录。
 - **配置友好**：JSONC 支持 `//` 和 `#` 注释，保存即热重载。
@@ -77,9 +77,9 @@ flowchart LR
 
 ## 快速开始
 
-### 一步安装（最推荐）
+### 一条命令，什么都不用装（最推荐）
 
-运行下面这一条命令即可。它会**自动判断你的系统**、下载对应的**预编译二进制**（无需装 Python），然后引导你填 API Key 并注册到你的 Agent：
+**不用装 Python、不用配置环境、不用区分平台**。运行一条命令，它会自动识别你的系统、下载单文件自包含二进制、安装、注册到你的 Agent，并引导你填写 API Key：
 
 macOS / Linux：
 
@@ -93,14 +93,46 @@ Windows PowerShell：
 iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.ps1)
 ```
 
-完成后：重启你的 Agent，直接粘贴图片就能用。配置会生成在 `~/.config/vision-mcp/config.json`（可随时改）。
+自动完成的事：
 
-### 其他方式（可选）
+1. 识别系统 / CPU → macOS（arm64 + x86_64）、Linux（x86_64）、Windows（x86_64）。
+2. 从 GitHub Releases 下载对应的**单文件二进制**——**无需 Python**。
+3. 安装到 `~/.local/bin/vision-mcp`（Windows：`%LOCALAPPDATA%\vision-mcp\vision-mcp.exe`）。
+4. 检测到 Codex / Claude Desktop / Cursor 时自动注册。
+5. 提示你填写 API Key，重启 Agent，直接粘贴图片就能用。
 
-- **已有 Python / 想装成包**：`pip install git+https://github.com/LaconicChip/vision-mcp.git && vision-mcp init`
-- **零配置文件的一行**（单通道，跨平台）：`uvx --from git+https://github.com/LaconicChip/vision-mcp vision-mcp --api-key KEY --base-url URL --model MODEL`
+配置生成在 `~/.config/vision-mcp/config.json`（可随时改，保存即热重载）。如果找不到对应平台的二进制，会自动回退到 `git clone` + Python 方式。
+
+### 或者：让 Agent 自己装
+
+如果你正在用 Codex / Claude / Cursor，直接把仓库链接丢给当前会话即可——**Agent 会把 vision-mcp 装进你正在用的这个 Agent**：
+
+> `install https://github.com/LaconicChip/vision-mcp`
+
+就这么简单，不用复制任何命令。随便怎么说都行（"帮我把这个 MCP 装进当前环境"也可以）。Agent 会克隆仓库、运行安装器、并把自己注册进当前环境。
+
+### 零配置单通道（进阶）
+
+一行指向任意 OpenAI 兼容视觉端点，**完全不需要配置文件**：
+
+```bash
+vision-mcp --api-key KEY --base-url https://host/v1/chat/completions --model YOUR_VLM
+```
+
+### 其他安装方式（可选）
+
+<details>
+<summary>pip / uvx / 源码（需要 Python）</summary>
+
+- **pip**：`pip install git+https://github.com/LaconicChip/vision-mcp.git && vision-mcp init`
+- **uvx**：`uvx --from git+https://github.com/LaconicChip/vision-mcp vision-mcp --api-key KEY --base-url URL --model MODEL`
+- **源码**：`git clone https://github.com/LaconicChip/vision-mcp && cd vision-mcp && python3 server.py`
+
+</details>
 
 ## 注册到你的 Agent
+
+一键安装会在检测到 Codex、Claude Desktop、Cursor 时**自动注册**。想手动注册的话，把任意 MCP 客户端指向已安装的二进制即可（无需 Python）：
 
 ### Codex
 
@@ -108,34 +140,20 @@ iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/i
 # ~/.codex/config.toml
 [mcp_servers.vision-mcp]
 type = "stdio"
-command = "python3"
-args = ["/你的绝对路径/vision-mcp/server.py"]
+command = "/你的绝对路径/vision-mcp"   # 例如 ~/.local/bin/vision-mcp
+args = []
 startup_timeout_sec = 120
 ```
 
-### Claude Desktop
+### Claude Desktop / Cursor
 
 ```json
-// claude_desktop_config.json
+// claude_desktop_config.json  /  ~/.cursor/mcp.json
 {
   "mcpServers": {
     "vision-mcp": {
-      "command": "python3",
-      "args": ["/你的绝对路径/vision-mcp/server.py"]
-    }
-  }
-}
-```
-
-### Cursor
-
-```json
-// ~/.cursor/mcp.json
-{
-  "mcpServers": {
-    "vision-mcp": {
-      "command": "python3",
-      "args": ["/你的绝对路径/vision-mcp/server.py"]
+      "command": "/你的绝对路径/vision-mcp",
+      "args": []
     }
   }
 }
@@ -144,15 +162,11 @@ startup_timeout_sec = 120
 ### 任意 stdio MCP 客户端
 
 ```text
-command: python3
-args: ["/你的绝对路径/vision-mcp/server.py"]
+command: /你的绝对路径/vision-mcp
+args: []
 ```
 
-`install.py` 可以打印以上全部示例：
-
-```bash
-python3 install.py --print-clients
-```
+> 源码方式运行时改用 `command: python3`、`args: ["/你的绝对路径/vision-mcp/server.py"]`。
 
 ## 配置
 
@@ -183,7 +197,7 @@ python3 install.py --print-clients
 | `agnes-2.5-flash` | agnes-2.5-flash | `AGNES_API_KEY` |
 | `agnes-2.0-flash` | agnes-2.0-flash | `AGNES_API_KEY` |
 
-> ℹ️ 保底通道（`custom-1`）默认**不预填任何配置**。免费竞速池全部失败/超时后会自动降级到这里，请在 `config.json` 里自行填写你的多模态模型的 `base_url`、`model` 和 key（或设置 `VISION_CUSTOM_API_KEY`）。
+> 🎯 **设计思想**：竞速池用**免费**模型，五个并发跑不花钱。`custom-1` 故意**留空**——它留给**你自己的**模型（付费 / 私有 / 本地中转都可以）。只有当五个免费模型全部失败/超时后才会触发它，所以日常请求不会动用你的付费/私有模型。在 `config.json` 里填它的 `base_url`、`model` 和 key（或设置 `VISION_CUSTOM_API_KEY`）。
 
 添加任意 OpenAI 兼容视觉模型：新增一个通道，并把它的 id 放进 `routing.race` 或 `routing.fallback`。
 
