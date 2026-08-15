@@ -1,18 +1,27 @@
-# vision-mcp 一键安装（Windows PowerShell）
+# vision-mcp 一键安装（Windows PowerShell，自动判断系统）
 # 用法: iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.ps1)
-param([string]$Target = "codex")  # codex | claude | cursor | all
-
-$repo = "https://github.com/LaconicChip/vision-mcp.git"
+$repo = "LaconicChip/vision-mcp"
 $tmp = Join-Path $env:TEMP ("vision-mcp-" + [guid]::NewGuid().ToString("N"))
-git clone --depth 1 $repo $tmp | Out-Null
-if (-not $?) { Write-Error "git clone 失败"; exit 1 }
+New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 
-Push-Location $tmp
-python install.py --for $Target
+# 1) 优先下载预编译二进制（无需 Python）
+$asset = "vision-mcp-Windows-x86_64.exe"
+$url = "https://github.com/$repo/releases/latest/download/$asset"
+$bin = Join-Path $tmp "vision-mcp.exe"
+try {
+  Invoke-WebRequest -Uri $url -OutFile $bin -UseBasicParsing -ErrorAction Stop
+  & $bin install
+  Remove-Item -Recurse -Force $tmp
+  exit $LASTEXITCODE
+} catch {
+  Write-Host "（未找到预编译包，回退到 Python 方式...）"
+}
+
+# 2) 回退：git + python
+git clone --depth 1 "https://github.com/$repo.git" "$tmp\vision-mcp" | Out-Null
+Push-Location "$tmp\vision-mcp"
+python server.py install
+$code = $LASTEXITCODE
 Pop-Location
 Remove-Item -Recurse -Force $tmp
-
-Write-Host ""
-Write-Host "✅ 完成。请编辑配置填写 API Key：" -ForegroundColor Green
-Write-Host "   $HOME\.mcp-servers\vision-mcp\config.json"
-Write-Host "然后重启你的 Agent。"
+exit $code

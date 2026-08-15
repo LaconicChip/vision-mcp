@@ -77,14 +77,14 @@ flowchart LR
 
 ## 快速开始
 
-### 1) 一条命令安装 + 注册
+### 一步安装（最推荐）
+
+运行下面这一条命令即可。它会**自动判断你的系统**、下载对应的**预编译二进制**（无需装 Python），然后引导你填 API Key 并注册到你的 Agent：
 
 macOS / Linux：
 
 ```bash
-# 注册到 Codex
-curl -fsSL https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.sh | bash -s codex
-# 或：bash -s claude / bash -s cursor / bash -s all
+curl -fsSL https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.sh | bash
 ```
 
 Windows PowerShell：
@@ -93,32 +93,12 @@ Windows PowerShell：
 iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.ps1)
 ```
 
-已经装了 Python、更喜欢包方式？
+完成后：重启你的 Agent，直接粘贴图片就能用。配置会生成在 `~/.config/vision-mcp/config.json`（可随时改）。
 
-```bash
-pip install git+https://github.com/LaconicChip/vision-mcp.git
-vision-mcp init              # 生成 ~/.config/vision-mcp/config.json
-vision-mcp --status          # 再用你的 Agent 的 MCP 配置注册
-```
+### 其他方式（可选）
 
-### 2) 填写 API Key
-
-编辑 `~/.mcp-servers/vision-mcp/config.json` —— 每个字段都有注释。最少要填：
-
-- 智谱 key 填到 `glm` / `glm-thinking` / `glm-4.6v-flash`；
-- Agnes key 填到 `agnes-*` 两个通道；
-- （可选）`custom-1` 填你自己的保底多模态模型。
-
-### 3) 测试并重启
-
-```bash
-python3 ~/.mcp-servers/vision-mcp/server.py --status
-python3 ~/.mcp-servers/vision-mcp/server.py --verify /path/to/screenshot.png
-```
-
-重启你的 Agent，粘贴图片即可。
-
-> 💡 **没有 Python？** 到 **Releases** 页下载对应系统的预编译二进制（由 GitHub Actions 构建），把 Agent 的 MCP 配置指向该二进制，而不是 `python3`。
+- **已有 Python / 想装成包**：`pip install git+https://github.com/LaconicChip/vision-mcp.git && vision-mcp init`
+- **零配置文件的一行**（单通道，跨平台）：`uvx --from git+https://github.com/LaconicChip/vision-mcp vision-mcp --api-key KEY --base-url URL --model MODEL`
 
 ## 注册到你的 Agent
 

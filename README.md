@@ -78,14 +78,14 @@ flowchart LR
 
 ## Quick start
 
-### 1) One-command install + register
+### 一步安装（最推荐）
+
+运行下面这一条命令即可。它会**自动判断你的系统**、下载对应的**预编译二进制**（无需装 Python），然后引导你填 API Key 并注册到你的 Agent：
 
 macOS / Linux:
 
 ```bash
-# register to Codex
-curl -fsSL https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.sh | bash -s codex
-# or: bash -s claude / bash -s cursor / bash -s all
+curl -fsSL https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.sh | bash
 ```
 
 Windows PowerShell:
@@ -94,32 +94,12 @@ Windows PowerShell:
 iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.ps1)
 ```
 
-Already have Python and prefer a package?
+完成后：重启你的 Agent，直接粘贴图片就能用。配置会生成在 `~/.config/vision-mcp/config.json`（可随时改）。
 
-```bash
-pip install git+https://github.com/LaconicChip/vision-mcp.git
-vision-mcp init              # generate ~/.config/vision-mcp/config.json
-vision-mcp --status          # then register with your agent's MCP config
-```
+### 其他方式（可选）
 
-### 2) Fill in API keys
-
-Edit `~/.mcp-servers/vision-mcp/config.json` — every field has comments. Minimal edits:
-
-- put your GLM key in the `glm` / `glm-thinking` / `glm-4.6v-flash` channels;
-- put your Agnes key in the `agnes-*` channels;
-- (optional) fill `custom-1` with your own fallback model.
-
-### 3) Test & restart
-
-```bash
-python3 ~/.mcp-servers/vision-mcp/server.py --status
-python3 ~/.mcp-servers/vision-mcp/server.py --verify /path/to/screenshot.png
-```
-
-Restart your agent and paste an image.
-
-> 💡 **No Python?** Download the prebuilt binary for your OS from the **Releases** tab (built by GitHub Actions), and point your agent's MCP config at that binary instead of `python3`.
+- **已有 Python / 想装成包**：`pip install git+https://github.com/LaconicChip/vision-mcp.git && vision-mcp init`
+- **零配置文件的一行**（单通道，跨平台）：`uvx --from git+https://github.com/LaconicChip/vision-mcp vision-mcp --api-key KEY --base-url URL --model MODEL`
 
 ## Register with your agent
 

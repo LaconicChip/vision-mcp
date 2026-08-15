@@ -72,6 +72,98 @@ def init_config() -> Path:
     return target
 
 
+CODEX_TOML = Path.home() / ".codex" / "config.toml"
+CLAUDE_JSON = Path.home() / "Library/Application Support/Claude/claude_desktop_config.json"
+CURSOR_JSON = Path.home() / ".cursor" / "mcp.json"
+
+
+def _ask(label: str, default: str = "") -> str:
+    try:
+        if sys.stdin.isatty():
+            return input(f"{label} [{default}]: ").strip() or default
+    except Exception:
+        pass
+    return default
+
+
+def _set_keys_in_place(path: Path, mapping: list[tuple[str, str]]) -> None:
+    """按通道顺序把 api_key 占位替换成用户 key，保留 JSONC 注释。"""
+    text = path.read_text(encoding="utf-8")
+    marker = '"api_key": ""'
+    for _, key in mapping:
+        if not key:
+            continue
+        i = text.find(marker)
+        if i < 0:
+            break
+        text = text[:i] + f'"api_key": "{key}"' + text[i + len(marker):]
+    path.write_text(text, encoding="utf-8")
+
+
+def _add_json_server(path: Path, server: str) -> None:
+    data = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    servers = data.setdefault("mcpServers", {})
+    servers["vision-mcp"] = {"command": "python3", "args": [server]}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def cmd_install() -> int:
+    """交互式一键安装配置：填 key + 注册到 Agent。"""
+    cfg = init_config()
+    print(f"配置: {cfg}")
+
+    keys = [
+        ("glm", "智谱 Key（glm / glm-thinking / glm-4.6v）"),
+        ("agnes", "Agnes Key（agnes-2.5 / agnes-2.0）"),
+        ("custom-1", "保底多模态模型 Key（可选，回车跳过）"),
+    ]
+    mapping: list[tuple[str, str]] = []
+    for i, (k, label) in enumerate(keys):
+        val = _ask(f"{label}", "")
+        if k == "custom-1" and not val:
+            continue
+        mapping.append((k, val))
+    # 模板里 api_key 占位顺序：glm, glm-thinking, glm-4.6v, agnes-2.5, agnes-2.0, custom-1
+    order = ["glm", "glm", "glm", "agnes", "agnes"]
+    if any(k == "custom-1" for k, _ in mapping):
+        order.append("custom-1")
+    filled = []
+    for i, tag in enumerate(order):
+        key = next((v for k, v in mapping if k == tag), "")
+        filled.append((tag, key))
+    _set_keys_in_place(cfg, filled)
+
+    server_cmd = str(Path(__file__).resolve().parent / "server.py")
+    print("\n注册到哪个 Agent？（可多行，每次一个，空行结束）")
+    print("  输入: codex / claude / cursor")
+    while True:
+        choice = _ask("Agent", "")
+        if not choice:
+            break
+        if choice == "codex" and CODEX_TOML.exists():
+            block = f'[mcp_servers.vision-mcp]\ntype = "stdio"\ncommand = "python3"\nargs = ["{server_cmd}"]\nstartup_timeout_sec = 120\n'
+            text = CODEX_TOML.read_text(encoding="utf-8")
+            CODEX_TOML.write_text(text + "\n" + block, encoding="utf-8")
+            print("  ✓ 已写入 ~/.codex/config.toml")
+        elif choice == "claude":
+            _add_json_server(CLAUDE_JSON, server_cmd)
+            print(f"  ✓ 已写入 {CLAUDE_JSON}")
+        elif choice == "cursor":
+            _add_json_server(CURSOR_JSON, server_cmd)
+            print(f"  ✓ 已写入 {CURSOR_JSON}")
+        else:
+            print("  未知或未找到 Codex 配置，跳过。")
+
+    print("\n✅ 完成。重启对应 Agent 后即可使用。")
+    return 0
+
+
 IMAGE_MIME = {
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
     ".webp": "image/webp", ".gif": "image/gif", ".bmp": "image/bmp",
@@ -597,6 +689,17 @@ def error(msg_id, code: int, message: str) -> dict:
     return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": code, "message": message}}
 
 
+class _MemoryConfig:
+    """不落盘的内联配置：满足 .get()/.path 接口，供零配置模式使用。"""
+
+    def __init__(self, data: dict):
+        self._data = data
+        self.path = Path("(inline)")
+
+    def get(self) -> dict:
+        return self._data
+
+
 _HOLDER = {"config": None}
 
 
@@ -728,13 +831,41 @@ def main_loop() -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="vision-mcp")
-    parser.add_argument("cmd", nargs="?", default=None, help="init = 生成用户配置")
+    parser.add_argument("cmd", nargs="?", default=None, help="init = 生成配置 / install = 一键安装配置")
     parser.add_argument("--config", help="覆盖 config.json 路径")
     parser.add_argument("--status", action="store_true", help="打印路由/通道状态")
     parser.add_argument("--verify", metavar="IMAGE", help="对一张图跑一次完整竞速")
     parser.add_argument("--prompt", default="Describe this image accurately and briefly.")
     parser.add_argument("--no-cache", action="store_true")
+    # 零配置内联模式：给这些参数即可不读 config.json
+    parser.add_argument("--api-key", help="极简模式：单通道 API Key")
+    parser.add_argument("--base-url", help="极简模式：OpenAI 兼容 chat/completions 地址")
+    parser.add_argument("--model", help="极简模式：模型名")
+    parser.add_argument("--provider", default="custom", help="极简模式：服务商标识")
+    parser.add_argument("--timeout", type=int, default=120, help="极简模式：超时秒数")
+    parser.add_argument("--max-tokens", type=int, default=2048, help="极简模式：输出上限")
     args = parser.parse_args()
+
+    # 零配置内联模式：一行命令直接跑，不需要配置文件
+    if args.api_key and args.base_url and args.model:
+        mem = {
+            "default_prompt": DEFAULT_PROMPT,
+            "channels": [{
+                "id": "custom", "provider": args.provider, "base_url": args.base_url,
+                "model": args.model, "api_key": args.api_key, "api_key_env": "",
+                "timeout_ms": args.timeout * 1000, "max_tokens": args.max_tokens,
+            }],
+            "race": ["custom"], "fallback": [],
+            "max_tokens": args.max_tokens, "timeout_ms": args.timeout * 1000,
+            "max_file_bytes": 15 * 1024 * 1024,
+            "cache": {"enabled": False, "directory": "", "ttl_seconds": 0},
+            "ocr": {"baidu": {"enabled": False}, "tesseract": {"enabled": False}},
+            "document": {"mineru": {"enabled": False}},
+        }
+        _HOLDER["config"] = _MemoryConfig(mem)
+
+    if args.cmd == "install":
+        return cmd_install()
     if args.cmd == "init":
         path = init_config()
         print(f"已生成配置: {path}\n请编辑该文件填写 API Key。")
