@@ -514,6 +514,8 @@ def macos_vision_ocr(image: bytes, accurate: bool, languages: str) -> dict:
 
 
 _WINDOWS_OCR_PS1 = r"""param([string]$Path, [string]$Lang = "")
+$OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $null = [Windows.Storage.StorageFile, Windows.Storage, ContentType = WindowsRuntime]
 $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
@@ -531,8 +533,16 @@ $file   = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($Path)) ([W
 $stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
 $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
 $bmp = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
-if ($Lang) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage([Windows.Globalization.Language]::new($Lang)) }
-else { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
+# 语言：config 里是 "zh-Hans,en-US"，按逗号逐个尝试；全部失败退回系统用户语言
+$engine = $null
+if ($Lang) {
+  foreach ($tag in ($Lang.Split(",") | ForEach-Object { $_.Trim() })) {
+    try { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage([Windows.Globalization.Language]::new($tag)) }
+    catch { $engine = $null }
+    if ($engine) { break }
+  }
+}
+if (-not $engine) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
 if (-not $engine) { Write-Error "系统无可用 OCR 语言"; exit 1 }
 $res = Await ($engine.RecognizeAsync($bmp)) ([Windows.Media.Ocr.OcrResult])
 $res.Lines | ForEach-Object { $_.Text }"""
@@ -547,7 +557,7 @@ def windows_ocr(image: bytes, languages: str) -> dict:
         open(ps_path, "w", encoding="utf-8").write(_WINDOWS_OCR_PS1)
         proc = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
                                "-File", ps_path, "-Path", img_path, "-Lang", languages],
-                              capture_output=True, text=True, timeout=90)
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90)
         if proc.returncode != 0:
             raise RuntimeError(f"Windows OCR 失败: {(proc.stderr or proc.stdout).strip()[-300:]}")
         text = proc.stdout.strip()
@@ -714,27 +724,29 @@ class VisionRouter:
         attempts: list[dict] = []
         max_tokens = int(max_tokens or (max(2048, config["max_tokens"]) if complex else config["max_tokens"]))
 
-        # 1) 五模型并发竞速
-        race = self._ready(config.get("race", []))
-        if race:
-            env, race_attempts = self._race(race, data_url, prompt, max_tokens, no_cache)
-            attempts.extend(race_attempts)
-            if env:
-                env.setdefault("metadata", {})["race"] = {"mode": "first-success", "attempts": race_attempts}
-                env["metadata"]["attempts"] = attempts
-                return env
-
-        # 2) 五模型全部失败才走 fallback（火山引擎）
-        for cid in config.get("fallback", []):
-            for ch in self._ready([cid]):
-                started = time.time()
-                try:
-                    env = self._call(ch, data_url, prompt, max_tokens, no_cache)
-                    env.setdefault("metadata", {})["attempts"] = attempts
+        # 1) 五模型并发竞速（显式 ocr 意图直接走本地 OCR，不调云端）
+        if intent != "ocr":
+            race = self._ready(config.get("race", []))
+            if race:
+                env, race_attempts = self._race(race, data_url, prompt, max_tokens, no_cache)
+                attempts.extend(race_attempts)
+                if env:
+                    env.setdefault("metadata", {})["race"] = {"mode": "first-success", "attempts": race_attempts}
+                    env["metadata"]["attempts"] = attempts
                     return env
-                except Exception as e:
-                    attempts.append({"channel": cid, "ok": False,
-                                     "latency_ms": int((time.time() - started) * 1000), "error": error_text(e)})
+
+        # 2) 竞速全部失败才走 fallback（用户自定义兜底；显式 ocr 意图跳过）
+        if intent != "ocr":
+            for cid in config.get("fallback", []):
+                for ch in self._ready([cid]):
+                    started = time.time()
+                    try:
+                        env = self._call(ch, data_url, prompt, max_tokens, no_cache)
+                        env.setdefault("metadata", {})["attempts"] = attempts
+                        return env
+                    except Exception as e:
+                        attempts.append({"channel": cid, "ok": False,
+                                         "latency_ms": int((time.time() - started) * 1000), "error": error_text(e)})
 
         # 3) 后续兜底：OCR（系统原生，自动识别平台）
         if intent in ("auto", "ocr") or accurate_ocr:

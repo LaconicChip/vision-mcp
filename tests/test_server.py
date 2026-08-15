@@ -141,6 +141,31 @@ class RoutingTest(unittest.TestCase):
                 if old is not None:
                     os.environ["SURELY_MISSING_KEY_XYZ"] = old
 
+    def test_ocr_intent_skips_cloud_and_forces_system_ocr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg_path = Path(tmp) / "config.json"
+            cfg_path.write_text(json.dumps({
+                "routing": {"race": ["a"], "fallback": ["b"]},
+                "channels": [
+                    {"id": "a", "base_url": "https://a.example/v1/chat/completions", "model": "m1", "api_key": "k"},
+                    {"id": "b", "base_url": "https://b.example/v1/chat/completions", "model": "m2", "api_key": "k"},
+                ],
+                "ocr": {"system": {"enabled": True, "languages": ""}, "tesseract": {"enabled": False}},
+            }), encoding="utf-8")
+            cfg = srv.Config(str(cfg_path))
+            router = srv.VisionRouter(cfg.get)
+            fake = {"content": "识别结果", "tool_used": "vision:macos", "confidence": "high",
+                    "metadata": {}, "latency_ms": 0}
+            # 显式 ocr 意图：即使竞速通道有效 key，也不调任何云通道，直接走系统 OCR
+            with unittest.mock.patch.object(srv, "system_ocr", return_value=fake) as mock_ocr, \
+                    unittest.mock.patch.object(srv, "call_channel") as mock_call:
+                env = router.route_image(
+                    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                    "p", "ocr", False, False, True)
+                mock_ocr.assert_called_once()
+                mock_call.assert_not_called()
+            self.assertEqual(env["tool_used"], "vision:macos")
+
 
 class ServerCommandTest(unittest.TestCase):
     """server_command()：源码用 python3，frozen 用二进制自身（免 Python）。"""
