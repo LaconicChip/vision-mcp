@@ -78,9 +78,17 @@ flowchart LR
 
 ## Quick start
 
-### One command, nothing to install (recommended)
+### Let your agent install it (recommended)
 
-No Python. No environment setup. No platform-specific steps. Run one line — it detects your OS, downloads a single self-contained binary, installs it, registers with your agent, and walks you through API keys:
+Already inside Codex, Claude, or Cursor? Paste the repo link right into your session — the agent installs vision-mcp **into the very agent you're using**:
+
+> `install https://github.com/LaconicChip/vision-mcp`
+
+That's it — no terminal, no commands to copy. Any wording works ("install this MCP into my environment" works too). The agent clones the repo, runs the installer, and registers itself with the current agent.
+
+### Or: one-command install
+
+Prefer a terminal? Run one line — no Python. It detects your OS, downloads a single self-contained binary, installs it, registers with your agent, and walks you through API keys:
 
 macOS / Linux:
 
@@ -103,14 +111,6 @@ What happens under the hood:
 5. Enter your API keys when prompted, restart your agent, and paste an image.
 
 Config is generated at `~/.config/vision-mcp/config.json` (edit anytime — hot-reloads). If no prebuilt binary exists for your platform, the installer falls back to `git clone` + Python.
-
-### Prefer your agent? Let it install itself
-
-Already inside Codex, Claude, or Cursor? Paste the repo link right into your session — the agent installs vision-mcp **into the very agent you're using**:
-
-> `install https://github.com/LaconicChip/vision-mcp`
-
-That's it — no terminal, no commands to copy. Any wording works ("帮我把这个 MCP 装进当前环境" works too). The agent clones the repo, runs the installer, and registers itself.
 
 ### Zero-config single channel (advanced)
 

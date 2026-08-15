@@ -77,9 +77,17 @@ flowchart LR
 
 ## 快速开始
 
-### 一条命令，什么都不用装（最推荐）
+### 让 Agent 自己装（最推荐）
 
-**不用装 Python、不用配置环境、不用区分平台**。运行一条命令，它会自动识别你的系统、下载单文件自包含二进制、安装、注册到你的 Agent，并引导你填写 API Key：
+如果你正在用 Codex / Claude / Cursor，直接把仓库链接丢给当前会话即可——**Agent 会把 vision-mcp 装进你正在用的这个 Agent**：
+
+> `install https://github.com/LaconicChip/vision-mcp`
+
+就这么简单，不用复制任何命令。随便怎么说都行（"帮我把这个 MCP 装进当前环境"也可以）。Agent 会克隆仓库、运行安装器、并把自己注册进当前环境。
+
+### 或者：一条命令安装
+
+用终端的话，运行一条命令即可——**不用装 Python、不用配置环境、不用区分平台**。它会自动识别你的系统、下载单文件自包含二进制、安装、注册到你的 Agent，并引导你填写 API Key：
 
 macOS / Linux：
 
@@ -102,14 +110,6 @@ iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/i
 5. 提示你填写 API Key，重启 Agent，直接粘贴图片就能用。
 
 配置生成在 `~/.config/vision-mcp/config.json`（可随时改，保存即热重载）。如果找不到对应平台的二进制，会自动回退到 `git clone` + Python 方式。
-
-### 或者：让 Agent 自己装
-
-如果你正在用 Codex / Claude / Cursor，直接把仓库链接丢给当前会话即可——**Agent 会把 vision-mcp 装进你正在用的这个 Agent**：
-
-> `install https://github.com/LaconicChip/vision-mcp`
-
-就这么简单，不用复制任何命令。随便怎么说都行（"帮我把这个 MCP 装进当前环境"也可以）。Agent 会克隆仓库、运行安装器、并把自己注册进当前环境。
 
 ### 零配置单通道（进阶）
 
