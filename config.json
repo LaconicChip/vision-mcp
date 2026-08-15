@@ -1,0 +1,136 @@
+{
+  // =============================================================
+  // vision-mcp 配置（JSONC：支持 // 和 # 注释，保存后自动热重载）
+  // 复制为 config.json 后填写你的 API Key。
+  // =============================================================
+
+  // ---- 旧式扁平配置（兼容 glm-vision-mcp 的填法）--------------------
+  // 只填这一个 api_key 就能启用下面的 volcengine 通道；
+  // 也可以留空，改用环境变量 GLM_MCP_API_KEY。
+  "legacy": {
+    "provider": "volcengine-ark",
+    "api_key": "",                          // ← 火山引擎 Ark Key
+    "model": "minimax-m3",
+    "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
+    "max_tokens": 2048,
+    "temperature": 0.2,
+    "timeout": 120,
+    "default_prompt": "请详细描述这张图片的内容，包括画面中的文字、物体、界面元素、数据、代码和可能的含义。如果这是截图，请重点提取其中的关键信息。"
+  },
+
+  // ---- 路由顺序 ------------------------------------------------------
+  // 1) race：多个模型并发，首个有效结果获胜
+  // 2) fallback：race 全部失败/超时才调用（兜底）
+  "routing": {
+    "race": [
+      "glm",               // glm-4v-flash
+      "glm-thinking",      // glm-4.1v-thinking-flash
+      "glm-4.6v-flash",    // glm-4.6v-flash（⚠️ 不稳定，可能限流/慢）
+      "agnes-2.5-flash",   // agnes-2.5-flash
+      "agnes-2.0-flash"    // agnes-2.0-flash
+    ],
+    "fallback": [
+      "volcengine"         // 火山引擎 minimax-m3，仅兜底
+    ]
+  },
+
+  // ---- 通道列表：每个都是 OpenAI 兼容 chat/completions --------------
+  // 每个通道填 api_key（字面量）或 api_key_env（环境变量名）；api_key 优先。
+  "channels": [
+    {
+      "id": "volcengine",
+      "provider": "volcengine-ark",
+      "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions",
+      "model": "minimax-m3",
+      "api_key": "",                          // ← 火山引擎 Key（或留空用 GLM_MCP_API_KEY）
+      "api_key_env": "GLM_MCP_API_KEY",
+      "timeout_ms": 120000,
+      "max_tokens": 2048,
+      "temperature": 0.2
+    },
+    {
+      "id": "glm",
+      "provider": "zhipu",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      "model": "glm-4v-flash",
+      "api_key": "",                          // ← 智谱 Key（GLM_API_KEY）
+      "api_key_env": "GLM_API_KEY",
+      "timeout_ms": 90000,
+      "max_tokens": 2048
+    },
+    {
+      "id": "glm-thinking",
+      "provider": "zhipu",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      "model": "glm-4.1v-thinking-flash",
+      "api_key": "",                          // 与 glm 同一个智谱 Key
+      "api_key_env": "GLM_API_KEY",
+      "timeout_ms": 90000,
+      "max_tokens": 2048
+    },
+    {
+      "id": "glm-4.6v-flash",
+      "provider": "zhipu",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      "model": "glm-4.6v-flash",
+      "api_key": "",                          // 与 glm 同一个智谱 Key
+      "api_key_env": "GLM_API_KEY",
+      "timeout_ms": 120000,
+      "max_tokens": 2048,
+      "note": "glm-4.6v-flash 可用但不稳定：可能 429 限流或响应很慢（实测约 24s），保留作补充"
+    },
+    {
+      "id": "agnes-2.5-flash",
+      "provider": "agnes",
+      "base_url": "https://apihub.agnes-ai.com/v1/chat/completions",
+      "model": "agnes-2.5-flash",
+      "api_key": "",                          // ← Agnes Key（AGNES_API_KEY）
+      "api_key_env": "AGNES_API_KEY",
+      "timeout_ms": 90000,
+      "max_tokens": 2048
+    },
+    {
+      "id": "agnes-2.0-flash",
+      "provider": "agnes",
+      "base_url": "https://apihub.agnes-ai.com/v1/chat/completions",
+      "model": "agnes-2.0-flash",
+      "api_key": "",                          // 与 agnes-2.5-flash 同一个 key
+      "api_key_env": "AGNES_API_KEY",
+      "timeout_ms": 90000,
+      "max_tokens": 2048
+    }
+  ],
+
+  "limits": {
+    "max_file_bytes": 15728640,   // 15 MB
+    "timeout_ms": 90000,
+    "max_tokens": 1024
+  },
+
+  "storage": {
+    "cache_enabled": true,
+    "cache_dir": "~/.cache/vision-mcp",
+    "cache_ttl_seconds": 604800   // 7 天
+  },
+
+  "ocr": {
+    "baidu": {
+      "enabled": false,                    // 需 BAIDU_API_KEY / BAIDU_SECRET_KEY
+      "api_key_env": "BAIDU_API_KEY",
+      "secret_key_env": "BAIDU_SECRET_KEY"
+    },
+    "tesseract": {
+      "enabled": false,                    // 需本机安装 tesseract
+      "command": "tesseract",
+      "languages": "chi_sim+eng"
+    }
+  },
+
+  "document": {
+    "mineru": {
+      "enabled": false,
+      "command": "mineru-open-api",
+      "mode": "flash"
+    }
+  }
+}

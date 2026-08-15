@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+tests/.pytest_cache/
+.DS_Store
+artifacts/
+dist/
