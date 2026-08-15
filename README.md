@@ -76,43 +76,49 @@ flowchart LR
 - OCR intent tries Baidu → Tesseract, then falls back to VLM.
 - `glm-4.6v-flash` is kept in the race but flagged unstable (rate limits / slow).
 
-## No Python? Use the prebuilt binary
-
-Users **do not need to install Python**. This repository ships a single-file executable built with PyInstaller (via GitHub Actions / `scripts/build.sh`):
-
-- Download the binary for your OS from the **Releases** tab (or build it yourself).
-- Register the MCP with that binary path instead of `python3`:
-
-```text
-command: /path/to/vision-mcp          # macOS/Linux
-command: C:\path\to\vision-mcp.exe  # Windows
-```
-
-The source (`server.py`) remains fully supported for anyone who already has Python 3.9+.
-
 ## Quick start
 
+### 1) One-command install + register
 
-Requirements: Python 3.9+.
+macOS / Linux:
 
 ```bash
-# 1) Copy the folder
-cp -r vision-mcp ~/vision-mcp
-cd ~/vision-mcp
-
-# 2) Create config from the committed template and fill in keys
-cp config.example.json config.json   # or just edit config.json
-# edit config.json — every field has comments
-
-# 3) Test
-python3 server.py --status
-python3 server.py --verify /path/to/screenshot.png
-
-# 4) Run as MCP
-python3 server.py
+# register to Codex
+curl -fsSL https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.sh | bash -s codex
+# or: bash -s claude / bash -s cursor / bash -s all
 ```
 
-The repo ships a **committed `config.json`** (keys cleared) so you can edit it in place; `config.example.json` is the same file as a backup.
+Windows PowerShell:
+
+```powershell
+iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.ps1)
+```
+
+Already have Python and prefer a package?
+
+```bash
+pip install git+https://github.com/LaconicChip/vision-mcp.git
+vision-mcp --status          # then register with your agent's MCP config
+```
+
+### 2) Fill in API keys
+
+Edit `~/.mcp-servers/vision-mcp/config.json` — every field has comments. Minimal edits:
+
+- put your GLM key in the `glm` / `glm-thinking` / `glm-4.6v-flash` channels;
+- put your Agnes key in the `agnes-*` channels;
+- (optional) fill `custom-1` with your own fallback model.
+
+### 3) Test & restart
+
+```bash
+python3 ~/.mcp-servers/vision-mcp/server.py --status
+python3 ~/.mcp-servers/vision-mcp/server.py --verify /path/to/screenshot.png
+```
+
+Restart your agent and paste an image.
+
+> 💡 **No Python?** Download the prebuilt binary for your OS from the **Releases** tab (built by GitHub Actions), and point your agent's MCP config at that binary instead of `python3`.
 
 ## Register with your agent
 
@@ -215,10 +221,12 @@ Add any OpenAI-compatible vision model by adding a channel and putting its id in
 
 ## CLI
 
+When installed as a package, use the `vision-mcp` command; from a checkout, use `python3 server.py`:
+
 ```bash
-python3 server.py --status                 # routing / channel readiness
-python3 server.py --verify /path/x.png     # run one real race, print winner
-python3 server.py                          # run as MCP stdio server
+vision-mcp --status                 # routing / channel readiness
+vision-mcp --verify /path/x.png     # run one real race, print winner
+vision-mcp                          # run as MCP stdio server
 ```
 
 ## Privacy & failure behavior

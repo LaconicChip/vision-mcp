@@ -75,43 +75,49 @@ flowchart LR
 - OCR 意图会先试百度 → Tesseract，再降级到视觉模型。
 - `glm-4.6v-flash` 保留在竞速里，但标记为不稳定（可能限流/很慢）。
 
-## 没有 Python？用预编译二进制
-
-用户**不需要安装 Python**。本仓库通过 GitHub Actions / `scripts/build.sh` 用 PyInstaller 打包成单文件可执行程序：
-
-- 从 **Releases** 页下载对应系统（Windows/macOS/Linux）的二进制，或自行构建。
-- 注册 MCP 时直接指向该二进制，而不是 `python3`：
-
-```text
-command: /path/to/vision-mcp          # macOS / Linux
-command: C:\path\to\vision-mcp.exe  # Windows
-```
-
-源码（`server.py`）仍完整支持已装有 Python 3.9+ 的用户。
-
 ## 快速开始
 
+### 1) 一条命令安装 + 注册
 
-要求：Python 3.9+。
+macOS / Linux：
 
 ```bash
-# 1) 复制目录
-cp -r vision-mcp ~/vision-mcp
-cd ~/vision-mcp
-
-# 2) 用已提交的模板创建/编辑配置并填写 key
-cp config.example.json config.json   # 或直接编辑 config.json
-# 编辑 config.json — 每个字段都有注释
-
-# 3) 测试
-python3 server.py --status
-python3 server.py --verify /path/to/screenshot.png
-
-# 4) 以 MCP 方式运行
-python3 server.py
+# 注册到 Codex
+curl -fsSL https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.sh | bash -s codex
+# 或：bash -s claude / bash -s cursor / bash -s all
 ```
 
-仓库自带一份**已提交的 `config.json`**（key 已清空），可直接编辑；`config.example.json` 是同样的备份。
+Windows PowerShell：
+
+```powershell
+iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/install.ps1)
+```
+
+已经装了 Python、更喜欢包方式？
+
+```bash
+pip install git+https://github.com/LaconicChip/vision-mcp.git
+vision-mcp --status          # 再用你的 Agent 的 MCP 配置注册
+```
+
+### 2) 填写 API Key
+
+编辑 `~/.mcp-servers/vision-mcp/config.json` —— 每个字段都有注释。最少要填：
+
+- 智谱 key 填到 `glm` / `glm-thinking` / `glm-4.6v-flash`；
+- Agnes key 填到 `agnes-*` 两个通道；
+- （可选）`custom-1` 填你自己的保底多模态模型。
+
+### 3) 测试并重启
+
+```bash
+python3 ~/.mcp-servers/vision-mcp/server.py --status
+python3 ~/.mcp-servers/vision-mcp/server.py --verify /path/to/screenshot.png
+```
+
+重启你的 Agent，粘贴图片即可。
+
+> 💡 **没有 Python？** 到 **Releases** 页下载对应系统的预编译二进制（由 GitHub Actions 构建），把 Agent 的 MCP 配置指向该二进制，而不是 `python3`。
 
 ## 注册到你的 Agent
 
@@ -214,10 +220,12 @@ python3 install.py --print-clients
 
 ## 命令行
 
+装成包后用 `vision-mcp` 命令；源码方式用 `python3 server.py`：
+
 ```bash
-python3 server.py --status                 # 路由/通道状态
-python3 server.py --verify /path/x.png     # 对一张图跑一次完整竞速，打印获胜模型
-python3 server.py                          # 以 MCP stdio 模式运行
+vision-mcp --status                 # 路由/通道状态
+vision-mcp --verify /path/x.png     # 对一张图跑一次完整竞速，打印获胜模型
+vision-mcp                          # 以 MCP stdio 模式运行
 ```
 
 ## 隐私与失败策略

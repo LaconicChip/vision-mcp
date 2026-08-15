@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vision-mcp"
+version = "1.0.0"
+description = "Agent-agnostic MCP vision server: race multiple vision models, get grounded text back."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+keywords = ["mcp", "vision", "multimodal", "ocr", "image-to-text", "stdio"]
+classifiers = [
+    "Environment :: Console",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.scripts]
+vision-mcp = "server:main"
+
+[tool.setuptools]
+py-modules = ["server"]
