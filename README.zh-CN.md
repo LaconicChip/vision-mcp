@@ -97,6 +97,7 @@ iex (irm https://raw.githubusercontent.com/LaconicChip/vision-mcp/main/scripts/i
 
 ```bash
 pip install git+https://github.com/LaconicChip/vision-mcp.git
+vision-mcp init              # 生成 ~/.config/vision-mcp/config.json
 vision-mcp --status          # 再用你的 Agent 的 MCP 配置注册
 ```
 

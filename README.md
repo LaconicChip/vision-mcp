@@ -98,6 +98,7 @@ Already have Python and prefer a package?
 
 ```bash
 pip install git+https://github.com/LaconicChip/vision-mcp.git
+vision-mcp init              # generate ~/.config/vision-mcp/config.json
 vision-mcp --status          # then register with your agent's MCP config
 ```
 

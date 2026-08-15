@@ -44,6 +44,34 @@ DEFAULT_PROMPT = (
     "请详细描述这张图片的内容，包括画面中的文字、物体、界面元素、数据、代码和可能的含义。"
     "如果这是截图，请重点提取其中的关键信息。"
 )
+DEFAULT_CONFIG_TEXT = "{\n  // =============================================================\n  // vision-mcp 配置（JSONC：支持 // 和 # 注释，保存后自动热重载）\n  // 复制/编辑 config.json 后填写你的 API Key。\n  // =============================================================\n\n  // ---- 默认提示词（可改）------------------------------------------\n  \"default_prompt\": \"请详细描述这张图片的内容，包括画面中的文字、物体、界面元素、数据、代码和可能的含义。如果这是截图，请重点提取其中的关键信息。\",\n\n  // ---- 路由顺序 ----------------------------------------------------\n  // 1) race：免费竞速池，多个模型并发，首个有效结果获胜\n  // 2) fallback：免费竞速池全部失败/超时后，自动降级到用户自定义保底模型\n  \"routing\": {\n    \"race\": [\n      \"glm\",               // glm-4v-flash\n      \"glm-thinking\",      // glm-4.1v-thinking-flash\n      \"glm-4.6v-flash\",    // glm-4.6v-flash（⚠️ 不稳定，可能限流/慢）\n      \"agnes-2.5-flash\",   // agnes-2.5-flash\n      \"agnes-2.0-flash\"    // agnes-2.0-flash\n    ],\n    \"fallback\": [\n      \"custom-1\"           // ← 用户自定义保底多模态模型（免费池全失败时自动降级）\n    ]\n  },\n\n  // ---- 免费竞速池通道：每个都是 OpenAI 兼容 chat/completions ------\n  // api_key（字面量）优先；没填则用 api_key_env 指向的环境变量。\n  \"channels\": [\n    {\n      \"id\": \"glm\",\n      \"provider\": \"zhipu\",\n      \"base_url\": \"https://open.bigmodel.cn/api/paas/v4/chat/completions\",\n      \"model\": \"glm-4v-flash\",\n      \"api_key\": \"\",                          // ← 智谱 Key（GLM_API_KEY）\n      \"api_key_env\": \"GLM_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n    {\n      \"id\": \"glm-thinking\",\n      \"provider\": \"zhipu\",\n      \"base_url\": \"https://open.bigmodel.cn/api/paas/v4/chat/completions\",\n      \"model\": \"glm-4.1v-thinking-flash\",\n      \"api_key\": \"\",                          // 与 glm 同一个智谱 Key\n      \"api_key_env\": \"GLM_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n    {\n      \"id\": \"glm-4.6v-flash\",\n      \"provider\": \"zhipu\",\n      \"base_url\": \"https://open.bigmodel.cn/api/paas/v4/chat/completions\",\n      \"model\": \"glm-4.6v-flash\",\n      \"api_key\": \"\",                          // 与 glm 同一个智谱 Key\n      \"api_key_env\": \"GLM_API_KEY\",\n      \"timeout_ms\": 120000,\n      \"max_tokens\": 2048,\n      \"note\": \"glm-4.6v-flash 可用但不稳定：可能 429 限流或响应很慢（实测约 24s），保留作补充\"\n    },\n    {\n      \"id\": \"agnes-2.5-flash\",\n      \"provider\": \"agnes\",\n      \"base_url\": \"https://apihub.agnes-ai.com/v1/chat/completions\",\n      \"model\": \"agnes-2.5-flash\",\n      \"api_key\": \"\",                          // ← Agnes Key（AGNES_API_KEY）\n      \"api_key_env\": \"AGNES_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n    {\n      \"id\": \"agnes-2.0-flash\",\n      \"provider\": \"agnes\",\n      \"base_url\": \"https://apihub.agnes-ai.com/v1/chat/completions\",\n      \"model\": \"agnes-2.0-flash\",\n      \"api_key\": \"\",                          // 与 agnes-2.5-flash 同一个 key\n      \"api_key_env\": \"AGNES_API_KEY\",\n      \"timeout_ms\": 90000,\n      \"max_tokens\": 2048\n    },\n\n    // ---- 用户自定义保底通道（免费竞速池全部失败后自动降级到这里）----\n    // 自行填写你的多模态模型地址、模型名和 key；也可从环境变量读取。\n    {\n      \"id\": \"custom-1\",\n      \"provider\": \"custom\",\n      \"base_url\": \"\",                          // ← 你的保底多模态模型 chat/completions 地址\n      \"model\": \"\",                             // ← 你的保底模型名\n      \"api_key\": \"\",                           // ← 你的保底模型 key（或留空用下面环境变量）\n      \"api_key_env\": \"VISION_CUSTOM_API_KEY\",\n      \"timeout_ms\": 120000,\n      \"max_tokens\": 4096\n    }\n  ],\n\n  // 限额：单图大小、超时、默认 max_tokens\n  \"limits\": {\n    \"max_file_bytes\": 15728640,   // 15 MB\n    \"timeout_ms\": 90000,\n    \"max_tokens\": 1024\n  },\n\n  // 缓存：按图片内容哈希缓存结果，避免重复调用\n  \"storage\": {\n    \"cache_enabled\": true,\n    \"cache_dir\": \"~/.cache/vision-mcp\",\n    \"cache_ttl_seconds\": 604800   // 7 天\n  },\n\n  // OCR（可选）：纯文字提取时兜底\n  \"ocr\": {\n    \"baidu\": {\n      \"enabled\": false,\n      \"api_key_env\": \"BAIDU_API_KEY\",\n      \"secret_key_env\": \"BAIDU_SECRET_KEY\"\n    },\n    \"tesseract\": {\n      \"enabled\": false,\n      \"command\": \"tesseract\",\n      \"languages\": \"chi_sim+eng\"\n    }\n  },\n\n  // 文档解析（可选）：PDF/Word/PPT 走 MinerU\n  \"document\": {\n    \"mineru\": {\n      \"enabled\": false,\n      \"command\": \"mineru-open-api\",\n      \"mode\": \"flash\"\n    }\n  }\n}\n"
+
+USER_CONFIG_DIR = Path.home() / ".config" / "vision-mcp"
+USER_CONFIG = USER_CONFIG_DIR / "config.json"
+
+
+def resolve_config_path() -> Path:
+    """配置路径优先级：DS_VISION_CONFIG > ~/.config/vision-mcp/config.json > 包目录 config.json"""
+    env = os.environ.get("DS_VISION_CONFIG")
+    if env:
+        return Path(env)
+    if USER_CONFIG.exists():
+        return USER_CONFIG
+    pkg = Path(__file__).resolve().parent / "config.json"
+    if pkg.exists():
+        return pkg
+    return USER_CONFIG
+
+
+def init_config() -> Path:
+    """生成用户级配置（首次运行 / vision-mcp init）。"""
+    target = Path(os.environ.get("DS_VISION_CONFIG") or USER_CONFIG)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if not target.exists():
+        target.write_text(DEFAULT_CONFIG_TEXT, encoding="utf-8")
+    return target
+
+
 IMAGE_MIME = {
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
     ".webp": "image/webp", ".gif": "image/gif", ".bmp": "image/bmp",
@@ -103,7 +131,7 @@ class Config:
     """读取 config.json（支持注释）+ 环境变量，按 mtime 热重载。"""
 
     def __init__(self, path: str | os.PathLike | None = None):
-        self.path = Path(path or DEFAULT_CONFIG)
+        self.path = Path(path) if path else resolve_config_path()
         self._mtime = -1.0
         self._data: dict = {}
         self._load()
@@ -700,12 +728,17 @@ def main_loop() -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="vision-mcp")
+    parser.add_argument("cmd", nargs="?", default=None, help="init = 生成用户配置")
     parser.add_argument("--config", help="覆盖 config.json 路径")
     parser.add_argument("--status", action="store_true", help="打印路由/通道状态")
     parser.add_argument("--verify", metavar="IMAGE", help="对一张图跑一次完整竞速")
     parser.add_argument("--prompt", default="Describe this image accurately and briefly.")
     parser.add_argument("--no-cache", action="store_true")
     args = parser.parse_args()
+    if args.cmd == "init":
+        path = init_config()
+        print(f"已生成配置: {path}\n请编辑该文件填写 API Key。")
+        return 0
     if args.config:
         _HOLDER["config"] = Config(args.config)
     if args.status:
