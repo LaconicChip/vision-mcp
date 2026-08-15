@@ -23,11 +23,11 @@
 
 <p align="center"><code>agent 看到图 → understand_image → 五模型竞速 → 兜底 → 返回可靠文本</code></p>
 
-一个**与 Agent 无关**的 MCP 服务器（stdio），让纯文本模型获得自然的图片输入体验。当连接的 Agent 遇到截图、上传图片、界面截图、图表或扫描件时，底层会调用 `understand_image` / `vision_analyze`。服务器并发调用多个视觉提供商，把结果转成**可靠文本**，纯文本模型继续正常推理。
+一个**不限Agent**的 MCP 服务器（stdio），让纯文本模型获得自然的图片输入体验。当连接的 Agent 遇到截图、上传图片、界面截图、图表或扫描件时，底层会调用 `understand_image` / `vision_analyze`。服务器并发调用多个视觉提供商，把结果转成**可靠文本**，纯文本模型继续正常推理。
 
 > [!NOTE]
 > 本项目是参考 [`Sorwcyra/ds-vision-plugin`](https://github.com/Sorwcyra/ds-vision-plugin)
-> 独立重写的更简洁版本。保留了相同的路由设计思想，但做到 **Agent 无关**、**零第三方依赖**，
+> 独立重写的更简洁版本。保留了相同的路由设计思想，但做到 **不限Agent**、**零第三方依赖**，
 > 并使用**人类友好的 JSONC 配置**，不再是 DeepSeek Harness 插件。
 
 ## 为什么需要它
