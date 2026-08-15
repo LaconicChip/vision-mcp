@@ -24,6 +24,8 @@
   <img alt="zero deps" src="https://img.shields.io/badge/dependencies-zero-16a34a?style=flat">
   <img alt="models" src="https://img.shields.io/badge/race-5%20models-4d6bfe?style=flat">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.9%2B-339933?style=flat&logo=python">
+<p align="center">
+  <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center"><code>agent sees image → understand_image → race ×5 → fallback → grounded text</code></p>
