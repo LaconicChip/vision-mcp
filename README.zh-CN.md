@@ -25,6 +25,8 @@
 
 一个**不限Agent**的 MCP 服务器（stdio），让纯文本模型获得自然的图片输入体验。当连接的 Agent 遇到截图、上传图片、界面截图、图表或扫描件时，底层会调用 `understand_image` / `vision_analyze`。服务器并发调用多个视觉提供商，把结果转成**可靠文本**，纯文本模型继续正常推理。
 
+> **当你的模型本身无法识别图片时，Agent 会自动把它交给本 MCP 来识别**——你就能像图片是普通文字一样继续推理。
+
 > [!NOTE]
 > 本项目是参考 [`Sorwcyra/ds-vision-plugin`](https://github.com/Sorwcyra/ds-vision-plugin)
 > 独立重写的更简洁版本。保留了相同的路由设计思想，但做到 **不限Agent**、**零第三方依赖**，

@@ -25,6 +25,8 @@
 
 An **agent-agnostic MCP server** (stdio) that gives text-only models a natural image experience. When the connected agent faces a screenshot, upload, UI snapshot, chart, or scan, it calls `understand_image` / `vision_analyze`. The server races multiple vision providers, returns **grounded text**, and the text-only model keeps reasoning normally.
 
+> **Whenever your model can't see an image itself, the agent automatically hands it to this MCP to recognize** — so you keep reasoning as if the picture were just text.
+
 > [!NOTE]
 > This project is a standalone, cleaner re-implementation inspired by
 > [`Sorwcyra/ds-vision-plugin`](https://github.com/Sorwcyra/ds-vision-plugin).
