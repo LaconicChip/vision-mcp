@@ -37,7 +37,7 @@ An **agent-agnostic MCP server** (stdio) that gives text-only models a natural i
 |---|---|
 | Paste screenshots directly into a text-only chat | A standard MCP tool (`understand_image`) any agent can call |
 | Don't want to wait on one slow or flaky provider | 5 models start together; first valid result wins |
-| Keep a proven multi-provider route design | glm ×3 + agnes ×2 race, volcengine fallback |
+| Keep a proven multi-provider route design | glm ×3 + agnes ×2 race, user-defined fallback |
 | Add a private relay, paid model, or local runtime | Add/reorder any OpenAI-compatible channel |
 | Configure without hand-editing confusing YAML | JSONC config with inline comments, hot reload |
 | Failures should be understandable | Visible error with full attempt log; images never silently dropped |
@@ -47,7 +47,7 @@ An **agent-agnostic MCP server** (stdio) that gives text-only models a natural i
 - **Agent-agnostic**: standard MCP stdio — works with Codex, Claude Desktop, Cursor, and any MCP client.
 - **Zero third-party dependencies**: pure Python stdlib, `python3` only.
 - **Five-model first-success race**: `glm-4v-flash`, `glm-4.1v-thinking-flash`, `glm-4.6v-flash` (⚠️ unstable), `agnes-2.5-flash`, `agnes-2.0-flash`.
-- **Volcengine only as fallback**: `minimax-m3` runs only when all five racers fail or time out.
+- **User-defined fallback**: when all five free racers fail or time out, the server degrades to your own `custom-1` multimodal model.
 - **Open-ended routing**: add unlimited OpenAI-compatible channels to the race or the ordered fallback.
 - **Explicit failure behavior**: images are never silently discarded; the error includes every attempt.
 - **Human-friendly config**: JSONC supports `//` and `#` comments, hot-reloads on save.
@@ -66,7 +66,7 @@ flowchart LR
     R --> T["Grounded text block"]
     O --> T
     C --> T
-    R -- "all fail / timeout" --> V["Fallback: volcengine minimax-m3"]
+    R -- "all fail / timeout" --> V["Fallback: custom-1 (your own VLM)"]
     V --> T
     T --> D["Text-only agent<br/>continues reasoning"]
 ```
@@ -175,15 +175,14 @@ Each channel is an OpenAI-compatible `chat/completions` endpoint:
 ### Built-in channels
 
 | Channel | Model | Key |
-|---|---|---|
-| `volcengine` | minimax-m3 | `GLM_MCP_API_KEY` |
+|---|---|
 | `glm` | glm-4v-flash | `GLM_API_KEY` |
 | `glm-thinking` | glm-4.1v-thinking-flash | `GLM_API_KEY` |
 | `glm-4.6v-flash` | glm-4.6v-flash (⚠️ unstable) | `GLM_API_KEY` |
 | `agnes-2.5-flash` | agnes-2.5-flash | `AGNES_API_KEY` |
 | `agnes-2.0-flash` | agnes-2.0-flash | `AGNES_API_KEY` |
 
-> ℹ️ The fallback channel (`volcengine`) is **not** pre-filled with any key. The race pool is free; when all free racers fail, the server automatically degrades to the fallback channel — fill in your own key in `config.json` (or set `GLM_MCP_API_KEY`).
+> ℹ️ The fallback channel (`custom-1`) is **not** pre-filled. The race pool is free; when all free racers fail or time out, the server degrades to `custom-1` — fill in your own multimodal model's `base_url`, `model` and key in `config.json` (or set `VISION_CUSTOM_API_KEY`).
 
 Add any OpenAI-compatible vision model by adding a channel and putting its id in `routing.race` or `routing.fallback`.
 
@@ -231,7 +230,7 @@ This project adapts the **multi-provider race + fallback** routing from
 - **Agent-agnostic MCP** instead of a DeepSeek Harness bundle.
 - **Zero third-party dependencies** — pure Python stdlib.
 - **JSONC config** with inline comments and hot reload instead of YAML.
-- **Five-model race** (adds `glm-4.6v-flash`) with **volcengine-only-as-fallback**.
+- **Five-model race** (adds `glm-4.6v-flash`) with a **user-defined fallback channel** (`custom-1`).
 - **Generic install** for Codex / Claude Desktop / Cursor / any MCP client.
 
 ## License

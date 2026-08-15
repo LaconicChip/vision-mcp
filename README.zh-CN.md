@@ -36,7 +36,7 @@
 |---|---|
 | 想把截图直接贴进纯文本对话 | 一个标准 MCP 工具（`understand_image`），任何 Agent 都能调用 |
 | 不想被单个视觉服务的慢响应或故障拖住 | 五模型同时启动，首个有效结果获胜 |
-| 复用经过验证的多提供商路由思路 | glm ×3 + agnes ×2 竞速，火山引擎兜底 |
+| 复用经过验证的多提供商路由思路 | glm ×3 + agnes ×2 竞速，用户自定义保底模型 |
 | 接入私有中转、付费模型或本地运行时 | 可添加/调整任意 OpenAI 兼容通道 |
 | 不想手工编辑令人困惑的 YAML | JSONC 配置带行内注释，且热重载 |
 | 失败时要知道发生了什么 | 可见错误 + 完整尝试记录，绝不静默丢图 |
@@ -46,7 +46,7 @@
 - **Agent 无关**：标准 MCP stdio，兼容 Codex、Claude Desktop、Cursor 等任意 MCP 客户端。
 - **零第三方依赖**：纯 Python 标准库，`python3` 即可运行。
 - **五模型并发竞速**：`glm-4v-flash`、`glm-4.1v-thinking-flash`、`glm-4.6v-flash`（⚠️ 不稳定）、`agnes-2.5-flash`、`agnes-2.0-flash`，首个有效结果获胜。
-- **火山引擎仅作兜底**：`minimax-m3` 只在五模型全部失败/超时才调用。
+- **用户自定义保底**：五模型全部失败/超时后，自动降级到你自己的 `custom-1` 多模态模型。
 - **路由可自由扩展**：可添加任意数量的 OpenAI 兼容通道，加入并发池或顺序降级队列。
 - **失败可见**：图片不会被静默丢弃；报错里包含每一次尝试记录。
 - **配置友好**：JSONC 支持 `//` 和 `#` 注释，保存即热重载。
@@ -65,7 +65,7 @@ flowchart LR
     R --> T["可靠文本"]
     O --> T
     C --> T
-    R -- "全部失败/超时" --> V["兜底：火山引擎 minimax-m3"]
+    R -- "全部失败/超时" --> V["兜底：custom-1（你自己的 VLM）"]
     V --> T
     T --> D["纯文本 Agent<br/>继续推理"]
 ```
@@ -174,15 +174,14 @@ python3 install.py --print-clients
 ### 内置通道
 
 | 通道 | 模型 | Key |
-|---|---|---|
-| `volcengine` | minimax-m3 | `GLM_MCP_API_KEY` |
+|---|---|
 | `glm` | glm-4v-flash | `GLM_API_KEY` |
 | `glm-thinking` | glm-4.1v-thinking-flash | `GLM_API_KEY` |
 | `glm-4.6v-flash` | glm-4.6v-flash（⚠️ 不稳定） | `GLM_API_KEY` |
 | `agnes-2.5-flash` | agnes-2.5-flash | `AGNES_API_KEY` |
 | `agnes-2.0-flash` | agnes-2.0-flash | `AGNES_API_KEY` |
 
-> ℹ️ 保底通道（`volcengine`）默认**不预填任何 key**。免费竞速池全部失败后会自动降级到该保底通道，请在 `config.json` 里自行填写你的 key（或设置 `GLM_MCP_API_KEY`）。
+> ℹ️ 保底通道（`custom-1`）默认**不预填任何配置**。免费竞速池全部失败/超时后会自动降级到这里，请在 `config.json` 里自行填写你的多模态模型的 `base_url`、`model` 和 key（或设置 `VISION_CUSTOM_API_KEY`）。
 
 添加任意 OpenAI 兼容视觉模型：新增一个通道，并把它的 id 放进 `routing.race` 或 `routing.fallback`。
 
@@ -229,7 +228,7 @@ python3 -m unittest discover -s tests -v
 - **Agent 无关的 MCP**，而不是 DeepSeek Harness 插件。
 - **零第三方依赖**，纯 Python 标准库。
 - **JSONC 配置**，带行内注释并热重载，而不是 YAML。
-- **五模型竞速**（新增 `glm-4.6v-flash`），**火山引擎仅作兜底**。
+- **五模型竞速**（新增 `glm-4.6v-flash`），**用户自定义保底通道**（`custom-1`）。
 - **通用安装**：兼容 Codex / Claude Desktop / Cursor / 任意 MCP 客户端。
 
 ## 开源许可

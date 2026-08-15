@@ -59,7 +59,7 @@ startup_timeout_sec = 120""",
 command: python3
 args: ["{server_path}"]
 env:
-  GLM_MCP_API_KEY: "你的火山引擎Key"   # 可选
+  VISION_CUSTOM_API_KEY: "你的保底模型Key"  # 可选（custom-1）
   GLM_API_KEY: "你的智谱Key"           # 可选
   AGNES_API_KEY: "你的AgnesKey"        # 可选""",
 }

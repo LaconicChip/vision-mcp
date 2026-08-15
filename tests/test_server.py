@@ -67,21 +67,15 @@ class ImageParsingTest(unittest.TestCase):
 
 
 class ConfigTest(unittest.TestCase):
-    def test_legacy_flat_config_synthesizes_channel(self):
+    def test_empty_config_has_no_builtin_provider(self):
         with tempfile.TemporaryDirectory() as tmp:
             cfg_path = Path(tmp) / "config.json"
-            cfg_path.write_text(json.dumps({
-                "provider": "volcengine-ark",
-                "api_key": "test-key",
-                "model": "minimax-m3",
-                "base_url": "https://example.com/api",
-            }), encoding="utf-8")
+            cfg_path.write_text(json.dumps({}), encoding="utf-8")
             cfg = srv.Config(str(cfg_path))
             data = cfg.get()
-            self.assertEqual(len(data["channels"]), 1)
-            self.assertEqual(data["channels"][0]["id"], "volcengine")
-            self.assertTrue(data["channels"][0]["base_url"].endswith("/chat/completions"))
-            self.assertTrue(data["race"])
+            self.assertEqual(data["channels"], [])
+            self.assertEqual(data["race"], [])
+            self.assertEqual(data["fallback"], [])
 
     def test_new_style_config(self):
         with tempfile.TemporaryDirectory() as tmp:

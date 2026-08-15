@@ -1,26 +1,15 @@
 {
   // =============================================================
   // vision-mcp 配置（JSONC：支持 // 和 # 注释，保存后自动热重载）
-  // 复制为 config.json 后填写你的 API Key。
+  // 复制/编辑 config.json 后填写你的 API Key。
   // =============================================================
 
-  // ---- 旧式扁平配置（兼容 glm-vision-mcp 的填法）--------------------
-  // 只填这一个 api_key 就能启用下面的 volcengine 通道；
-  // 也可以留空，改用环境变量 GLM_MCP_API_KEY。
-  "legacy": {
-    "provider": "volcengine-ark",
-    "api_key": "",                          // ← 保底通道 key，请自行填写（或留空，改用环境变量 GLM_MCP_API_KEY）
-    "model": "minimax-m3",
-    "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
-    "max_tokens": 2048,
-    "temperature": 0.2,
-    "timeout": 120,
-    "default_prompt": "请详细描述这张图片的内容，包括画面中的文字、物体、界面元素、数据、代码和可能的含义。如果这是截图，请重点提取其中的关键信息。"
-  },
+  // ---- 默认提示词（可改）------------------------------------------
+  "default_prompt": "请详细描述这张图片的内容，包括画面中的文字、物体、界面元素、数据、代码和可能的含义。如果这是截图，请重点提取其中的关键信息。",
 
-  // ---- 路由顺序 ------------------------------------------------------
-  // 1) race：多个模型并发，首个有效结果获胜
-  // 2) fallback：race 全部失败/超时才调用（兜底）
+  // ---- 路由顺序 ----------------------------------------------------
+  // 1) race：免费竞速池，多个模型并发，首个有效结果获胜
+  // 2) fallback：免费竞速池全部失败/超时后，自动降级到用户自定义保底模型
   "routing": {
     "race": [
       "glm",               // glm-4v-flash
@@ -30,24 +19,13 @@
       "agnes-2.0-flash"    // agnes-2.0-flash
     ],
     "fallback": [
-      "volcengine"         // 火山引擎 minimax-m3，仅兜底
+      "custom-1"           // ← 用户自定义保底多模态模型（免费池全失败时自动降级）
     ]
   },
 
-  // ---- 通道列表：每个都是 OpenAI 兼容 chat/completions --------------
-  // 每个通道填 api_key（字面量）或 api_key_env（环境变量名）；api_key 优先。
+  // ---- 免费竞速池通道：每个都是 OpenAI 兼容 chat/completions ------
+  // api_key（字面量）优先；没填则用 api_key_env 指向的环境变量。
   "channels": [
-    {
-      "id": "volcengine",
-      "provider": "volcengine-ark",
-      "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions",
-      "model": "minimax-m3",
-      "api_key": "",                          // ← 免费竞速池全部失败后自动降级到本保底通道，请自行填写 key；留空则用环境变量 GLM_MCP_API_KEY
-      "api_key_env": "GLM_MCP_API_KEY",
-      "timeout_ms": 120000,
-      "max_tokens": 2048,
-      "temperature": 0.2
-    },
     {
       "id": "glm",
       "provider": "zhipu",
@@ -98,34 +76,51 @@
       "api_key_env": "AGNES_API_KEY",
       "timeout_ms": 90000,
       "max_tokens": 2048
+    },
+
+    // ---- 用户自定义保底通道（免费竞速池全部失败后自动降级到这里）----
+    // 自行填写你的多模态模型地址、模型名和 key；也可从环境变量读取。
+    {
+      "id": "custom-1",
+      "provider": "custom",
+      "base_url": "",                          // ← 你的保底多模态模型 chat/completions 地址
+      "model": "",                             // ← 你的保底模型名
+      "api_key": "",                           // ← 你的保底模型 key（或留空用下面环境变量）
+      "api_key_env": "VISION_CUSTOM_API_KEY",
+      "timeout_ms": 120000,
+      "max_tokens": 4096
     }
   ],
 
+  // 限额：单图大小、超时、默认 max_tokens
   "limits": {
     "max_file_bytes": 15728640,   // 15 MB
     "timeout_ms": 90000,
     "max_tokens": 1024
   },
 
+  // 缓存：按图片内容哈希缓存结果，避免重复调用
   "storage": {
     "cache_enabled": true,
     "cache_dir": "~/.cache/vision-mcp",
     "cache_ttl_seconds": 604800   // 7 天
   },
 
+  // OCR（可选）：纯文字提取时兜底
   "ocr": {
     "baidu": {
-      "enabled": false,                    // 需 BAIDU_API_KEY / BAIDU_SECRET_KEY
+      "enabled": false,
       "api_key_env": "BAIDU_API_KEY",
       "secret_key_env": "BAIDU_SECRET_KEY"
     },
     "tesseract": {
-      "enabled": false,                    // 需本机安装 tesseract
+      "enabled": false,
       "command": "tesseract",
       "languages": "chi_sim+eng"
     }
   },
 
+  // 文档解析（可选）：PDF/Word/PPT 走 MinerU
   "document": {
     "mineru": {
       "enabled": false,

@@ -7,7 +7,7 @@ vision-mcp
 
 路由优先级：
   1. race：五模型并发竞速，首个有效结果获胜（glm / glm-thinking / glm-4.6v / agnes×2）
-  2. fallback：五模型全部失败/超时后，才调用 volcengine(minimax-m3)
+  2. fallback：五模型全部失败/超时后，降级到用户自定义的保底多模态模型
   3. OCR：仍失败且需要文字提取时，尝试 百度OCR → Tesseract
   4. 全部失败 → 明确报错并返回完整尝试记录
 
@@ -44,18 +44,6 @@ DEFAULT_PROMPT = (
     "请详细描述这张图片的内容，包括画面中的文字、物体、界面元素、数据、代码和可能的含义。"
     "如果这是截图，请重点提取其中的关键信息。"
 )
-LEGACY_DEFAULTS = {
-    "provider": "volcengine-ark", "api_key": "", "model": "minimax-m3",
-    "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
-    "max_tokens": 2048, "temperature": 0.2, "timeout": 120,
-    "default_prompt": DEFAULT_PROMPT,
-}
-ENV_MAP = {  # 环境变量 -> 旧式扁平配置键
-    "GLM_MCP_API_KEY": "api_key", "GLM_MCP_MODEL": "model",
-    "GLM_MCP_BASE_URL": "base_url", "GLM_MCP_PROVIDER": "provider",
-    "GLM_MCP_MAX_TOKENS": "max_tokens", "GLM_MCP_TEMPERATURE": "temperature",
-    "GLM_MCP_DEFAULT_PROMPT": "default_prompt",
-}
 IMAGE_MIME = {
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
     ".webp": "image/webp", ".gif": "image/gif", ".bmp": "image/bmp",
@@ -107,18 +95,6 @@ def strip_json_comments(text: str) -> str:
     return "".join(out)
 
 
-def _legacy_volcengine_config() -> dict:
-    """旧 glm-vision-mcp 的 config.json 兜底（火山引擎 key）。"""
-    path = Path.home() / ".codex/mcp-servers/glm-vision-mcp/config.json"
-    try:
-        if path.exists():
-            data = json.loads(strip_json_comments(path.read_text(encoding="utf-8")))
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        pass
-    return {}
-
-
 # ---------------------------------------------------------------------------
 # 配置
 # ---------------------------------------------------------------------------
@@ -154,53 +130,16 @@ class Config:
         return self._data
 
 
-def _env_legacy() -> dict:
-    legacy = dict(LEGACY_DEFAULTS)
-    for env_name, key in ENV_MAP.items():
-        val = (os.environ.get(env_name) or "").strip()
-        if not val:
-            continue
-        if key == "max_tokens":
-            legacy[key] = int(val)
-        elif key == "temperature":
-            legacy[key] = float(val)
-        else:
-            legacy[key] = val
-    return legacy
-
-
 def normalize(raw: dict) -> dict:
-    """把配置文件归一化成运行时结构。返回顶层含 race/fallback/channels... 的 dict。"""
-    legacy = _env_legacy()
-    legacy.update({k: v for k, v in (raw.get("legacy") or {}).items() if v not in (None, "")})
-
-    # 通道：新式 channels 优先，否则用旧式扁平配置合成一个 volcengine 通道
+    """归一化配置。channels 完全来自 config；不合成任何内置提供商。"""
     channels = raw.get("channels") or []
-    if not isinstance(channels, list) or not channels:
-        base = (legacy.get("base_url") or "").strip().rstrip("/")
-        base = base if base.endswith("/chat/completions") else base + "/chat/completions"
-        channels = [{
-            "id": "volcengine", "provider": legacy["provider"], "model": legacy["model"],
-            "base_url": base, "api_key": legacy["api_key"], "api_key_env": "GLM_MCP_API_KEY",
-            "timeout_ms": int(legacy["timeout"]) * 1000, "max_tokens": int(legacy["max_tokens"]),
-            "temperature": float(legacy["temperature"]),
-        }]
-        raw = {"routing": {"race": ["volcengine"], "fallback": []}}
-    else:
-        # 旧式扁平配置的 key/model 兜底给 volcengine 通道
-        for ch in channels:
-            if ch.get("id") == "volcengine":
-                ch.setdefault("api_key", legacy.get("api_key") or "")
-                ch.setdefault("api_key_env", "GLM_MCP_API_KEY")
-                ch.setdefault("base_url", legacy.get("base_url") or "")
-                ch.setdefault("model", legacy.get("model") or "")
-                break
-
+    if not isinstance(channels, list):
+        channels = []
     routing = raw.get("routing") or {}
     race = [str(x) for x in routing.get("race", []) if isinstance(x, (str, int))]
     fallback = [str(x) for x in routing.get("fallback", []) if isinstance(x, (str, int))]
     if not race and not fallback:
-        race = [ch.get("id", "volcengine") for ch in channels]
+        race = [ch.get("id") for ch in channels if isinstance(ch, dict) and ch.get("id")]
 
     limits = raw.get("limits") or {}
     storage = raw.get("storage") or {}
@@ -210,14 +149,14 @@ def normalize(raw: dict) -> dict:
     tess = ocr.get("tesseract") or {}
     mineru = document.get("mineru") or {}
 
-    cache_dir = os.path.expanduser(os.path.expandvars(storage.get("cache_dir") or "~/.dsh/cache/ds-vision"))
+    cache_dir = os.path.expanduser(os.path.expandvars(storage.get("cache_dir") or "~/.cache/vision-mcp"))
     return {
-        "default_prompt": legacy.get("default_prompt") or DEFAULT_PROMPT,
+        "default_prompt": raw.get("default_prompt") or DEFAULT_PROMPT,
         "channels": channels,
         "race": race,
         "fallback": fallback,
-        "max_tokens": int(limits.get("max_tokens", legacy.get("max_tokens", 1024))),
-        "timeout_ms": int(limits.get("timeout_ms", int(legacy.get("timeout", 90)) * 1000)),
+        "max_tokens": int(limits.get("max_tokens", 1024)),
+        "timeout_ms": int(limits.get("timeout_ms", 90000)),
         "max_file_bytes": int(limits.get("max_file_bytes", 15 * 1024 * 1024)),
         "cache": {
             "enabled": bool(storage.get("cache_enabled", True)),
@@ -471,10 +410,7 @@ class VisionRouter:
     def _api_key(self, ch: dict) -> str:
         if ch.get("api_key"):
             return ch["api_key"]
-        val = os.environ.get(ch.get("api_key_env") or "VISION_API_KEY", "")
-        if val:
-            return val
-        return (_legacy_volcengine_config().get("api_key") or "") if ch.get("id") == "volcengine" else ""
+        return os.environ.get(ch.get("api_key_env") or "VISION_API_KEY", "") or ""
 
     def _ready(self, ids: list[str]) -> list[dict]:
         by_id = {c.get("id"): c for c in self.config["channels"] if isinstance(c, dict)}
@@ -545,7 +481,7 @@ class VisionRouter:
     def route_image(self, data_url: str, prompt: str, intent: str,
                     complex: bool, accurate_ocr: bool, no_cache: bool,
                     max_tokens: int | None = None) -> dict:
-        """路由：五模型 race → fallback(volcengine) → OCR → 报错。"""
+        """路由：五模型 race → fallback(用户自定义保底模型) → OCR → 报错。"""
         config = self.config
         image = base64.b64decode(data_url.split(",", 1)[1])
         if len(image) > config["max_file_bytes"]:
