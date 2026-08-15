@@ -503,8 +503,18 @@ def macos_vision_ocr(image: bytes, accurate: bool, languages: str) -> dict:
 
 
 _WINDOWS_OCR_PS1 = r"""param([string]$Path, [string]$Lang = "")
+$ErrorActionPreference = 'Stop'
 $OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+# WinRT GetFileFromPathAsync 要求绝对反斜杠路径；正斜杠/相对路径会抛错
+$Path = [IO.Path]::GetFullPath($Path)
+$ext = [IO.Path]::GetExtension($Path).ToLower()
+if ($ext -notin @('.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.gif', '.webp')) {
+  Write-Error "不支持的图片类型 '$ext'"
+  exit 1
+}
+
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $null = [Windows.Storage.StorageFile, Windows.Storage, ContentType = WindowsRuntime]
 $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
@@ -518,23 +528,29 @@ function Await($WinRtTask, $ResultType) {
   $net.Wait(-1) | Out-Null
   return $net.Result
 }
-$file   = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($Path)) ([Windows.Storage.StorageFile])
-$stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
-$decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
-$bmp = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
-# 语言：config 里是 "zh-Hans,en-US"，按逗号逐个尝试；全部失败退回系统用户语言
-$engine = $null
-if ($Lang) {
-  foreach ($tag in ($Lang.Split(",") | ForEach-Object { $_.Trim() })) {
-    try { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage([Windows.Globalization.Language]::new($tag)) }
-    catch { $engine = $null }
-    if ($engine) { break }
+
+try {
+  $file   = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($Path)) ([Windows.Storage.StorageFile])
+  $stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
+  $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
+  $bmp = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
+  # 语言：config 里是 "zh-Hans,en-US"，按逗号逐个尝试；全部失败退回系统用户语言
+  $engine = $null
+  if ($Lang) {
+    foreach ($tag in ($Lang.Split(",") | ForEach-Object { $_.Trim() })) {
+      try { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage([Windows.Globalization.Language]::new($tag)) }
+      catch { $engine = $null }
+      if ($engine) { break }
+    }
   }
-}
-if (-not $engine) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
-if (-not $engine) { Write-Error "系统无可用 OCR 语言"; exit 1 }
-$res = Await ($engine.RecognizeAsync($bmp)) ([Windows.Media.Ocr.OcrResult])
-$res.Lines | ForEach-Object { $_.Text }"""
+  if (-not $engine) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
+  if (-not $engine) { Write-Error "系统无可用 OCR 语言"; exit 1 }
+  $res = Await ($engine.RecognizeAsync($bmp)) ([Windows.Media.Ocr.OcrResult])
+  $res.Lines | ForEach-Object { $_.Text }
+} catch {
+  Write-Error "Windows OCR 失败: $($_.Exception.Message)"
+  exit 1
+}"""
 
 
 def windows_ocr(image: bytes, languages: str) -> dict:
@@ -851,7 +867,7 @@ def _run_tool(name: str, args: dict) -> str:
         return "\n".join(lines)
     if name == "vision_status":
         cfg = router.config
-        lines = [f"vision-mcp 视觉状态\n  配置  : {get_config().path}",
+        lines = [f"vision-mcp v{SERVER_VERSION} 视觉状态\n  配置  : {get_config().path}",
                  f"  路由  : race = {' + '.join(cfg['race']) or '(空)'} | fallback = {' -> '.join(cfg['fallback']) or '(空)'}",
                  f"  缓存  : {'on' if cfg['cache']['enabled'] else 'off'} -> {cfg['cache']['directory']}",
                  "  通道:"]
@@ -932,6 +948,13 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=120, help="极简模式：超时秒数")
     parser.add_argument("--max-tokens", type=int, default=2048, help="极简模式：输出上限")
     args = parser.parse_args()
+
+    # frozen 下 stdout 用 locale 编码（如 zh-CN=GBK），⚠/✅ 等 Unicode 会崩溃；强制 UTF-8
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
     # 零配置内联模式：一行命令直接跑，不需要配置文件
     if args.api_key and args.base_url and args.model:
