@@ -20,6 +20,9 @@ jobs:
           - os: windows-latest
             sysname: Windows
             arch: x86_64
+          - os: macos-13
+            sysname: Darwin
+            arch: x86_64
           - os: macos-latest
             sysname: Darwin
             arch: arm64
